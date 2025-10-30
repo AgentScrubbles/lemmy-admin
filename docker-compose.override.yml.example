@@ -1,0 +1,33 @@
+# docker-compose.override.yml.example
+# Copy this to docker-compose.override.yml and customize for your setup
+# Docker Compose automatically merges this with docker-compose.yml
+
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      # Option 1: Connect to PostgreSQL on host machine
+      # Uncomment ONE of these based on your OS:
+
+      # Mac/Windows:
+      # - DB_HOST=host.docker.internal
+
+      # Linux:
+      # - DB_HOST=172.17.0.1
+
+      # Option 2: Connect to PostgreSQL in another Docker network
+      # - DB_HOST=postgres
+
+      # Use your actual database credentials
+      - DB_PASSWORD=${DB_PASSWORD}
+
+    # Option 3: Connect to external Docker network (if Lemmy is in separate stack)
+    # networks:
+    #   - default
+    #   - lemmy_default
+
+# Uncomment if connecting to external network
+# networks:
+#   lemmy_default:
+#     external: true

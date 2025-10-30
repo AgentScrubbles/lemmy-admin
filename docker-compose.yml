@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lemmy-admin-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-lemmy}
+      - DB_USER=${DB_USER:-lemmy}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - LEMMY_INSTANCE_URL=${LEMMY_INSTANCE_URL:-https://poptalk.scrubbles.tech}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lemmy-admin-api.rule=Host(`your-domain.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.lemmy-admin-api.entrypoints=websecure"
+      - "traefik.http.routers.lemmy-admin-api.tls.certresolver=letsencrypt"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lemmy-admin-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_LEMMY_INSTANCE_URL=${LEMMY_INSTANCE_URL:-https://poptalk.scrubbles.tech}
+      - VITE_BACKEND_API_URL=${BACKEND_API_URL:-http://localhost:3001}
+    depends_on:
+      - backend
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lemmy-admin.rule=Host(`your-domain.com`)"
+      - "traefik.http.routers.lemmy-admin.entrypoints=websecure"
+      - "traefik.http.routers.lemmy-admin.tls.certresolver=letsencrypt"
