@@ -139,7 +139,16 @@ router.get('/:userId/details', async (req: Request, res: Response) => {
       return;
     }
 
-    res.json(result.rows[0]);
+    const user = result.rows[0];
+
+    // Parse numeric fields to prevent string concatenation issues
+    res.json({
+      ...user,
+      post_count: parseInt(user.post_count) || 0,
+      post_score: parseInt(user.post_score) || 0,
+      comment_count: parseInt(user.comment_count) || 0,
+      comment_score: parseInt(user.comment_score) || 0,
+    });
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -214,6 +223,10 @@ router.get('/:userId/voting-patterns', async (req: Request, res: Response) => {
 
     const userScores = receivedQuery.rows[0] || { post_score: 0, comment_score: 0 };
 
+    // Parse scores as integers to prevent string concatenation
+    const postScore = parseInt(userScores.post_score) || 0;
+    const commentScore = parseInt(userScores.comment_score) || 0;
+
     res.json({
       votesGiven: {
         upvotes: upvotesGiven,
@@ -222,9 +235,9 @@ router.get('/:userId/voting-patterns', async (req: Request, res: Response) => {
         upvoteRate: totalVotes > 0 ? (upvotesGiven / totalVotes) : 0
       },
       votesReceived: {
-        postScore: userScores.post_score || 0,
-        commentScore: userScores.comment_score || 0,
-        totalScore: (userScores.post_score || 0) + (userScores.comment_score || 0)
+        postScore: postScore,
+        commentScore: commentScore,
+        totalScore: postScore + commentScore
       }
     });
   } catch (error) {

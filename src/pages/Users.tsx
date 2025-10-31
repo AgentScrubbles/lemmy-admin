@@ -82,6 +82,7 @@ import {
   BehaviorAnalysis,
 } from '../services/backend';
 import { lemmyService } from '../services/lemmy';
+import { openaiService } from '../services/openai';
 import { config } from '../config';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -177,6 +178,13 @@ export const Users: React.FC = () => {
   // Track removed content
   const [removedPosts, setRemovedPosts] = useState<Set<number>>(new Set());
   const [removedComments, setRemovedComments] = useState<Set<number>>(new Set());
+
+  // AI Summary state
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiProgress, setAiProgress] = useState('');
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // Search for users with backend API
   useEffect(() => {
@@ -343,6 +351,59 @@ export const Users: React.FC = () => {
       navigate(fullPath, { replace: true });
     }
   }, [selectedUserHandle, communityFilter, communityBreakdown, navigate]);
+
+  // Check AI service availability when config is set
+  useEffect(() => {
+    const checkAiAvailability = async () => {
+      if (!config.openaiApiUrl) {
+        setAiAvailable(false);
+        return;
+      }
+
+      try {
+        const available = await openaiService.isAvailable();
+        setAiAvailable(available);
+      } catch (error) {
+        console.error('Error checking AI availability:', error);
+        setAiAvailable(false);
+      }
+    };
+
+    checkAiAvailability();
+  }, []);
+
+  // Auto-generate AI summary when user data is loaded
+  useEffect(() => {
+    if (aiAvailable === true && userDetails && recentContent && !aiSummary && !aiGenerating && !aiError) {
+      generateAISummary();
+    }
+  }, [aiAvailable, userDetails, recentContent]);
+
+  // Generate AI summary when user data is loaded
+  const generateAISummary = async () => {
+    if (!userDetails || !recentContent || !aiAvailable) return;
+
+    setAiGenerating(true);
+    setAiError(null);
+    setAiSummary(null);
+    setAiProgress('Initializing...');
+
+    try {
+      const summary = await openaiService.summarizeUserActivity(
+        `${userDetails.name}@${userDetails.instance_domain}`,
+        recentContent,
+        (message) => setAiProgress(message)
+      );
+
+      setAiSummary(summary);
+    } catch (error) {
+      console.error('Error generating AI summary:', error);
+      setAiError(error instanceof Error ? error.message : 'Failed to generate summary');
+    } finally {
+      setAiGenerating(false);
+      setAiProgress('');
+    }
+  };
 
   // Admin action handlers
   const handleBanUser = async () => {
@@ -984,7 +1045,7 @@ export const Users: React.FC = () => {
                               <Typography variant="subtitle2">Positive Contributions</Typography>
                             </Box>
                             <Typography variant="body2">
-                              Total Content: {userDetails.post_count + userDetails.comment_count}
+                              Total Content: {(userDetails.post_count + userDetails.comment_count).toLocaleString()}
                             </Typography>
                             <Typography variant="body2">
                               Karma Earned: {votingPatterns.votesReceived.totalScore.toLocaleString()}
@@ -1006,7 +1067,7 @@ export const Users: React.FC = () => {
                             {behaviorAnalysis && (
                               <>
                                 <Typography variant="body2">
-                                  Negative Content: {behaviorAnalysis.metrics.negativePosts + behaviorAnalysis.metrics.negativeComments}
+                                  Negative Content: {(behaviorAnalysis.metrics.negativePosts + behaviorAnalysis.metrics.negativeComments).toLocaleString()}
                                 </Typography>
                                 <Typography variant="body2">
                                   Controversy Score: {behaviorAnalysis.metrics.avgControversy}%
@@ -1046,6 +1107,88 @@ export const Users: React.FC = () => {
                   )}
                 </Grid>
               </Grid>
+            </CardContent>
+          </Card>
+
+          {/* AI Summary Panel */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                ✨ AI Summary
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              {/* AI not available */}
+              {(aiAvailable === false || aiAvailable === null) && (
+                <Alert severity="info">
+                  AI summary is not available. To enable this feature, configure VITE_OPENAI_API_URL in your environment.
+                </Alert>
+              )}
+
+              {/* AI available, show generate button */}
+              {aiAvailable === true && !aiSummary && !aiGenerating && !aiError && (
+                <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    Generate an AI-powered summary of this user's activity and behavior patterns.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={generateAISummary}
+                  >
+                    Generate Summary
+                  </Button>
+                </Box>
+              )}
+
+              {/* Generating */}
+              {aiGenerating && (
+                <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
+                  <CircularProgress />
+                  <Typography variant="body2" color="text.secondary">
+                    {aiProgress}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Summary generated */}
+              {aiSummary && !aiGenerating && (
+                <Box>
+                  <Paper sx={{ p: 2, bgcolor: 'background.default' }} variant="outlined">
+                    <Typography variant="body1" style={{ whiteSpace: 'pre-line' }}>
+                      {aiSummary}
+                    </Typography>
+                  </Paper>
+                  <Box mt={2} display="flex" justifyContent="center">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={generateAISummary}
+                      disabled={aiGenerating}
+                    >
+                      Regenerate Summary
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Error */}
+              {aiError && !aiGenerating && (
+                <Box>
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {aiError}
+                  </Alert>
+                  <Box display="flex" justifyContent="center">
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={generateAISummary}
+                    >
+                      Retry
+                    </Button>
+                  </Box>
+                </Box>
+              )}
             </CardContent>
           </Card>
 
