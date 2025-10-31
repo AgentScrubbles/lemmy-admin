@@ -26,6 +26,78 @@ router.get('/health', async (req: Request, res: Response) => {
   }
 });
 
+// Lookup user by handle (username@instance.tld)
+router.get('/lookup/:userHandle', async (req: Request, res: Response) => {
+  try {
+    const userHandle = decodeURIComponent(req.params.userHandle);
+
+    // Parse username@instance format
+    const parts = userHandle.split('@');
+    if (parts.length !== 2) {
+      res.status(400).json({ error: 'Invalid user handle format. Expected: username@instance.tld' });
+      return;
+    }
+
+    const [username, instanceDomain] = parts;
+
+    // Lookup user by name and instance
+    const result = await db.query(
+      `SELECT p.id, p.name, i.domain as instance_domain
+       FROM person p
+       JOIN instance i ON i.id = p.instance_id
+       WHERE LOWER(p.name) = LOWER($1) AND LOWER(i.domain) = LOWER($2)
+       LIMIT 1`,
+      [username, instanceDomain]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error looking up user by handle:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Lookup community by handle (communityname@instance.tld)
+router.get('/lookup-community/:communityHandle', async (req: Request, res: Response) => {
+  try {
+    const communityHandle = decodeURIComponent(req.params.communityHandle);
+
+    // Parse communityname@instance format
+    const parts = communityHandle.split('@');
+    if (parts.length !== 2) {
+      res.status(400).json({ error: 'Invalid community handle format. Expected: communityname@instance.tld' });
+      return;
+    }
+
+    const [communityName, instanceDomain] = parts;
+
+    // Lookup community by name and instance
+    const result = await db.query(
+      `SELECT c.id, c.name, c.title, i.domain as instance_domain
+       FROM community c
+       JOIN instance i ON i.id = c.instance_id
+       WHERE LOWER(c.name) = LOWER($1) AND LOWER(i.domain) = LOWER($2)
+       LIMIT 1`,
+      [communityName, instanceDomain]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Community not found' });
+      return;
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error looking up community by handle:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get user basic details by ID
 router.get('/:userId/details', async (req: Request, res: Response) => {
   try {
@@ -53,9 +125,11 @@ router.get('/:userId/details', async (req: Request, res: Response) => {
         pa.post_score,
         pa.comment_count,
         pa.comment_score,
-        p.instance_id
+        p.instance_id,
+        i.domain as instance_domain
       FROM person p
       LEFT JOIN person_aggregates pa ON pa.person_id = p.id
+      JOIN instance i ON i.id = p.instance_id
       WHERE p.id = $1`,
       [userId]
     );
@@ -282,20 +356,23 @@ router.get('/:userId/community-breakdown', async (req: Request, res: Response) =
           c.id,
           c.name,
           c.title,
+          i.domain as instance_domain,
           COUNT(p.id) as post_count,
           COALESCE(SUM(pa.score), 0) as post_score,
           MAX(p.published) as last_post_at
         FROM post p
         JOIN post_aggregates pa ON pa.post_id = p.id
         JOIN community c ON c.id = p.community_id
+        JOIN instance i ON i.id = c.instance_id
         WHERE p.creator_id = $1
-        GROUP BY c.id, c.name, c.title
+        GROUP BY c.id, c.name, c.title, i.domain
       ),
       user_comment_communities AS (
         SELECT
           c.id,
           c.name,
           c.title,
+          i.domain as instance_domain,
           COUNT(cm.id) as comment_count,
           COALESCE(SUM(ca.score), 0) as comment_score,
           MAX(cm.published) as last_comment_at
@@ -303,13 +380,15 @@ router.get('/:userId/community-breakdown', async (req: Request, res: Response) =
         JOIN comment_aggregates ca ON ca.comment_id = cm.id
         JOIN post p ON p.id = cm.post_id
         JOIN community c ON c.id = p.community_id
+        JOIN instance i ON i.id = c.instance_id
         WHERE cm.creator_id = $1
-        GROUP BY c.id, c.name, c.title
+        GROUP BY c.id, c.name, c.title, i.domain
       )
       SELECT
         COALESCE(pc.id, cc.id) as community_id,
         COALESCE(pc.name, cc.name) as community_name,
         COALESCE(pc.title, cc.title) as community_title,
+        COALESCE(pc.instance_domain, cc.instance_domain) as instance_domain,
         COALESCE(pc.post_count, 0) as post_count,
         COALESCE(cc.comment_count, 0) as comment_count,
         COALESCE(pc.post_score, 0) as post_score,
@@ -358,10 +437,12 @@ router.get('/:userId/recent-content', async (req: Request, res: Response) => {
             pa.comments as comment_count,
             p.community_id,
             c.name as community_name,
-            c.title as community_title
+            c.title as community_title,
+            i.domain as instance_domain
           FROM post p
           JOIN post_aggregates pa ON pa.post_id = p.id
           JOIN community c ON p.community_id = c.id
+          JOIN instance i ON i.id = c.instance_id
           WHERE p.creator_id = $1 AND p.community_id = $2
           ORDER BY p.published DESC
           LIMIT $3`
@@ -376,10 +457,12 @@ router.get('/:userId/recent-content', async (req: Request, res: Response) => {
             pa.comments as comment_count,
             p.community_id,
             c.name as community_name,
-            c.title as community_title
+            c.title as community_title,
+            i.domain as instance_domain
           FROM post p
           JOIN post_aggregates pa ON pa.post_id = p.id
           JOIN community c ON p.community_id = c.id
+          JOIN instance i ON i.id = c.instance_id
           WHERE p.creator_id = $1
           ORDER BY p.published DESC
           LIMIT $2`;
@@ -406,11 +489,13 @@ router.get('/:userId/recent-content', async (req: Request, res: Response) => {
             p.name as post_name,
             p.community_id,
             c.name as community_name,
-            c.title as community_title
+            c.title as community_title,
+            i.domain as instance_domain
           FROM comment cm
           JOIN comment_aggregates ca ON ca.comment_id = cm.id
           JOIN post p ON cm.post_id = p.id
           JOIN community c ON p.community_id = c.id
+          JOIN instance i ON i.id = c.instance_id
           WHERE cm.creator_id = $1 AND p.community_id = $2
           ORDER BY cm.published DESC
           LIMIT $3`
@@ -425,11 +510,13 @@ router.get('/:userId/recent-content', async (req: Request, res: Response) => {
             p.name as post_name,
             p.community_id,
             c.name as community_name,
-            c.title as community_title
+            c.title as community_title,
+            i.domain as instance_domain
           FROM comment cm
           JOIN comment_aggregates ca ON ca.comment_id = cm.id
           JOIN post p ON cm.post_id = p.id
           JOIN community c ON p.community_id = c.id
+          JOIN instance i ON i.id = c.instance_id
           WHERE cm.creator_id = $1
           ORDER BY cm.published DESC
           LIMIT $2`;
@@ -455,10 +542,12 @@ router.get('/:userId/recent-content', async (req: Request, res: Response) => {
             pa.comments as comment_count,
             p.community_id,
             c.name as community_name,
-            c.title as community_title
+            c.title as community_title,
+            i.domain as instance_domain
           FROM post p
           JOIN post_aggregates pa ON pa.post_id = p.id
           JOIN community c ON p.community_id = c.id
+          JOIN instance i ON i.id = c.instance_id
           WHERE p.creator_id = $1 AND p.community_id = $2
           ORDER BY p.published DESC
           LIMIT $3`
@@ -473,10 +562,12 @@ router.get('/:userId/recent-content', async (req: Request, res: Response) => {
             pa.comments as comment_count,
             p.community_id,
             c.name as community_name,
-            c.title as community_title
+            c.title as community_title,
+            i.domain as instance_domain
           FROM post p
           JOIN post_aggregates pa ON pa.post_id = p.id
           JOIN community c ON p.community_id = c.id
+          JOIN instance i ON i.id = c.instance_id
           WHERE p.creator_id = $1
           ORDER BY p.published DESC
           LIMIT $2`;
@@ -610,9 +701,11 @@ router.get('/search/:query', async (req: Request, res: Response) => {
         pa.post_count,
         pa.post_score,
         pa.comment_count,
-        pa.comment_score
+        pa.comment_score,
+        i.domain as instance_domain
       FROM person p
       LEFT JOIN person_aggregates pa ON pa.person_id = p.id
+      JOIN instance i ON i.id = p.instance_id
       WHERE p.name ILIKE $1 OR p.display_name ILIKE $1
       ORDER BY pa.comment_count DESC, pa.post_count DESC
       LIMIT $2`,

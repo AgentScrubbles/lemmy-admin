@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -108,13 +109,19 @@ interface UserSearchResult {
   comment_count: number;
   local: boolean;
   bot_account: boolean;
+  instance_domain: string;
 }
 
 export const Users: React.FC = () => {
   const { user: authUser } = useAuth();
+  const { userHandle } = useParams<{ userHandle?: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserHandle, setSelectedUserHandle] = useState<string | null>(null);
 
   // User data from backend
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
@@ -195,6 +202,46 @@ export const Users: React.FC = () => {
     return () => clearTimeout(debounce);
   }, [searchTerm]);
 
+  // Load user from URL parameter on mount
+  useEffect(() => {
+    const loadUserFromURL = async () => {
+      if (!userHandle) return;
+
+      try {
+        const user = await backendAPI.lookupUserByHandle(userHandle);
+        setSelectedUserId(user.id);
+        setSelectedUserHandle(`${user.name}@${user.instance_domain}`);
+      } catch (err) {
+        console.error('Error loading user from URL:', err);
+        setError(`User not found: ${userHandle}`);
+      }
+    };
+
+    loadUserFromURL();
+  }, [userHandle]);
+
+  // Load community filter from URL parameter
+  useEffect(() => {
+    const loadCommunityFromURL = async () => {
+      const communityParam = searchParams.get('community');
+      if (!communityParam) {
+        setCommunityFilter('all');
+        return;
+      }
+
+      try {
+        const community = await backendAPI.lookupCommunityByHandle(communityParam);
+        setCommunityFilter(community.id);
+      } catch (err) {
+        console.error('Error loading community from URL:', err);
+        // Don't show error, just default to 'all'
+        setCommunityFilter('all');
+      }
+    };
+
+    loadCommunityFromURL();
+  }, [searchParams]);
+
   // Fetch all user data when selected
   useEffect(() => {
     const fetchUserData = async () => {
@@ -220,6 +267,12 @@ export const Users: React.FC = () => {
         updateStepStatus('User Details', 'loading');
         const details = await backendAPI.getUserDetails(selectedUserId);
         setUserDetails(details);
+
+        // Set user handle for URL
+        if (!selectedUserHandle) {
+          setSelectedUserHandle(`${details.name}@${details.instance_domain}`);
+        }
+
         updateStepStatus('User Details', 'complete');
 
         updateStepStatus('Voting Patterns', 'loading');
@@ -265,6 +318,31 @@ export const Users: React.FC = () => {
 
     fetchUserData();
   }, [selectedUserId, communityFilter]);
+
+  // Update URL when user or community filter changes
+  useEffect(() => {
+    if (!selectedUserHandle) return;
+
+    // Build new URL
+    let newPath = `/users/${encodeURIComponent(selectedUserHandle)}`;
+
+    // Add community query parameter if set
+    const params = new URLSearchParams();
+    if (communityFilter !== 'all' && communityBreakdown.length > 0) {
+      const selectedCommunity = communityBreakdown.find(cb => cb.community_id === communityFilter);
+      if (selectedCommunity) {
+        params.set('community', `${selectedCommunity.community_name}@${selectedCommunity.instance_domain}`);
+      }
+    }
+
+    const queryString = params.toString();
+    const fullPath = queryString ? `${newPath}?${queryString}` : newPath;
+
+    // Update URL without adding to history if we're already on the right page
+    if (window.location.pathname + window.location.search !== fullPath) {
+      navigate(fullPath, { replace: true });
+    }
+  }, [selectedUserHandle, communityFilter, communityBreakdown, navigate]);
 
   // Admin action handlers
   const handleBanUser = async () => {
@@ -473,7 +551,7 @@ export const Users: React.FC = () => {
   // Prepare pie chart data
   const pieChartData = useMemo(() => {
     return communityBreakdown.slice(0, 5).map((cb) => ({
-      name: cb.community_name,
+      name: `${cb.community_name}@${cb.instance_domain}`,
       value: parseInt(cb.post_count) + parseInt(cb.comment_count),
     }));
   }, [communityBreakdown]);
@@ -531,6 +609,7 @@ export const Users: React.FC = () => {
             onChange={(_, value) => {
               if (value && typeof value !== 'string') {
                 setSelectedUserId(value.id);
+                setSelectedUserHandle(`${value.name}@${value.instance_domain}`);
               }
             }}
             renderInput={(params) => (
@@ -556,7 +635,7 @@ export const Users: React.FC = () => {
                   {option.name.charAt(0).toUpperCase()}
                 </Avatar>
                 <Box>
-                  <Typography variant="body1">{option.name}</Typography>
+                  <Typography variant="body1">{option.name}@{option.instance_domain}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {option.post_count} posts • {option.comment_count} comments
                   </Typography>
@@ -576,7 +655,9 @@ export const Users: React.FC = () => {
         <Chip
           label="Change User"
           onClick={() => {
+            navigate('/users');
             setSelectedUserId(null);
+            setSelectedUserHandle(null);
             setSearchTerm('');
             setUserDetails(null);
             setVotingPatterns(null);
@@ -968,6 +1049,62 @@ export const Users: React.FC = () => {
             </CardContent>
           </Card>
 
+          {/* Community Filter Section */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+                <Box display="flex" alignItems="center" gap={2} flex={1}>
+                  <FilterAlt color="primary" />
+                  <Typography variant="h6">
+                    Community Filter
+                  </Typography>
+                  {communityFilter !== 'all' && (
+                    <Chip
+                      label="FILTER ACTIVE"
+                      color="primary"
+                      size="small"
+                      onDelete={() => setCommunityFilter('all')}
+                    />
+                  )}
+                </Box>
+                <FormControl sx={{ minWidth: 350 }}>
+                  <InputLabel>View Impact in Specific Community</InputLabel>
+                  <Select
+                    value={communityFilter}
+                    onChange={(e) => setCommunityFilter(e.target.value as number | 'all')}
+                    label="View Impact in Specific Community"
+                    disabled={loading}
+                  >
+                    <MenuItem value="all">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Typography fontWeight="bold">All Communities</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          (Site-wide activity)
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                    {communityBreakdown.map((cb) => (
+                      <MenuItem key={cb.community_id} value={cb.community_id}>
+                        <Box>
+                          <Typography>{cb.community_name}@{cb.instance_domain}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {parseInt(cb.post_count) + parseInt(cb.comment_count)} activities • Score: {parseInt(cb.post_score) + parseInt(cb.comment_score)}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                {loading && <CircularProgress size={24} />}
+              </Box>
+              {communityFilter !== 'all' && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  All charts, metrics, and content below are filtered to show only activity in the selected community.
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Charts Row */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
             {/* Activity Timeline */}
@@ -1047,28 +1184,6 @@ export const Users: React.FC = () => {
             </Grid>
           </Grid>
 
-          {/* Community Filter */}
-          <Box display="flex" alignItems="center" gap={2} mb={2}>
-            <FilterAlt />
-            <FormControl sx={{ minWidth: 300 }}>
-              <InputLabel>Filter by Community</InputLabel>
-              <Select
-                value={communityFilter}
-                onChange={(e) => setCommunityFilter(e.target.value as number | 'all')}
-                label="Filter by Community"
-                disabled={loading}
-              >
-                <MenuItem value="all">All Communities</MenuItem>
-                {communityBreakdown.map((cb) => (
-                  <MenuItem key={cb.community_id} value={cb.community_id}>
-                    {cb.community_name} ({parseInt(cb.post_count) + parseInt(cb.comment_count)} activities)
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {loading && <CircularProgress size={24} />}
-          </Box>
-
           {/* Content Safety Controls */}
           <Box display="flex" alignItems="center" gap={3} mb={2}>
             <FormControlLabel
@@ -1144,7 +1259,7 @@ export const Users: React.FC = () => {
                                 )}
                               </Box>
                             </TableCell>
-                            <TableCell>{post.community_name}</TableCell>
+                            <TableCell>{post.community_name}@{post.instance_domain}</TableCell>
                             <TableCell align="right">
                               <Chip
                                 label={post.score}
@@ -1248,7 +1363,7 @@ export const Users: React.FC = () => {
                                 {comment.post_name.substring(0, 40)}...
                               </MuiLink>
                             </TableCell>
-                            <TableCell>{comment.community_name}</TableCell>
+                            <TableCell>{comment.community_name}@{comment.instance_domain}</TableCell>
                             <TableCell align="right">
                               <Chip
                                 label={comment.score}
@@ -1324,7 +1439,7 @@ export const Users: React.FC = () => {
                             rel="noopener noreferrer"
                             underline="hover"
                           >
-                            {cb.community_name}
+                            {cb.community_name}@{cb.instance_domain}
                           </MuiLink>
                           <Typography variant="caption" display="block" color="text.secondary">
                             {cb.community_title}

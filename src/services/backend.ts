@@ -94,6 +94,16 @@ class BackendAPIService {
     });
     return response.data;
   }
+
+  async lookupUserByHandle(userHandle: string) {
+    const response = await this.api.get(`/api/users/lookup/${encodeURIComponent(userHandle)}`);
+    return response.data;
+  }
+
+  async lookupCommunityByHandle(communityHandle: string) {
+    const response = await this.api.get(`/api/users/lookup-community/${encodeURIComponent(communityHandle)}`);
+    return response.data;
+  }
 }
 
 // Export singleton instance
@@ -116,6 +126,7 @@ export interface UserDetails {
   comment_count: number;
   comment_score: number;
   instance_id: number;
+  instance_domain: string;
 }
 
 export interface VotingPatterns {
@@ -145,6 +156,7 @@ export interface CommunityBreakdown {
   community_id: number;
   community_name: string;
   community_title: string;
+  instance_domain: string;
   post_count: string;
   comment_count: string;
   post_score: string;
@@ -164,6 +176,7 @@ export interface RecentPost {
   community_id: number;
   community_name: string;
   community_title: string;
+  instance_domain: string;
 }
 
 export interface RecentComment {
@@ -178,6 +191,7 @@ export interface RecentComment {
   community_id: number;
   community_name: string;
   community_title: string;
+  instance_domain: string;
 }
 
 export interface RecentContent {

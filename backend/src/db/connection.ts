@@ -12,18 +12,62 @@ class Database {
   private pool: Pool;
 
   constructor() {
-    this.pool = new Pool({
-      host: config.database.host,
-      port: config.database.port,
-      database: config.database.database,
-      user: config.database.user,
-      password: config.database.password,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-      // Set default transaction to READ ONLY
-      options: '-c default_transaction_read_only=on',
+    // Determine if SSL is required from connection string
+    const usingSsl = config.database.connectionString?.toLowerCase().includes('sslmode=');
+
+    // For connection strings with sslmode, we need to handle SSL separately
+    // because the connection string parser can override our ssl object
+    let finalConnectionString = config.database.connectionString;
+    let sslObject = undefined;
+
+    if (usingSsl && !config.database.sslRejectUnauthorized) {
+      // For self-signed certificates: remove sslmode from connection string
+      // and use ssl object instead
+      finalConnectionString = config.database.connectionString?.replace(/[?&]sslmode=[^&]*/gi, '');
+      sslObject = {
+        rejectUnauthorized: false,
+      };
+      console.log('SSL: Accepting self-signed certificates');
+    } else if (usingSsl) {
+      // For verified SSL certificates: keep sslmode in connection string
+      sslObject = {
+        rejectUnauthorized: true,
+      };
+      console.log('SSL: Requiring verified certificates');
+    }
+
+    // Use connection string if provided, otherwise use individual parameters
+    const poolConfig = finalConnectionString
+      ? {
+          connectionString: finalConnectionString,
+          ssl: sslObject,
+          max: config.database.maxConnections,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000,
+          // Note: Some managed PostgreSQL services don't support the options parameter
+          // We'll enforce read-only at the query level instead
+        }
+      : {
+          host: config.database.host,
+          port: config.database.port,
+          database: config.database.database,
+          user: config.database.user,
+          password: config.database.password,
+          max: config.database.maxConnections,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000,
+          // Set default transaction to READ ONLY
+          options: '-c default_transaction_read_only=on',
+        };
+
+    console.log('Database pool config:', {
+      hasConnectionString: !!finalConnectionString,
+      usingSsl,
+      sslRejectUnauthorized: config.database.sslRejectUnauthorized,
+      ssl: sslObject,
     });
+
+    this.pool = new Pool(poolConfig);
 
     this.pool.on('error', (err) => {
       console.error('Unexpected error on idle client', err);
@@ -41,12 +85,14 @@ class Database {
       const result = await this.pool.query('SHOW default_transaction_read_only');
       const isReadOnly = result.rows[0].default_transaction_read_only === 'on';
       if (isReadOnly) {
-        console.log('✅ Database connection set to READ ONLY mode');
+        console.log('✅ Database connection set to READ ONLY mode at connection level');
       } else {
-        console.warn('⚠️  WARNING: Database connection is NOT in read-only mode!');
+        console.warn('⚠️  WARNING: Database connection is NOT in read-only mode at connection level');
+        console.warn('   Read-only enforcement will be done at query level (blocking write operations)');
       }
     } catch (error) {
-      console.error('Failed to verify read-only mode:', error);
+      console.warn('⚠️  Could not verify read-only mode at connection level (this is normal for managed PostgreSQL)');
+      console.warn('   Read-only enforcement will be done at query level (blocking write operations)');
     }
   }
 

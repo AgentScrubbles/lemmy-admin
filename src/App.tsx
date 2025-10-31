@@ -41,6 +41,16 @@ const App: React.FC = () => {
               }
             />
             <Route
+              path="/users/:userHandle"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Users />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/communities"
               element={
                 <ProtectedRoute>
