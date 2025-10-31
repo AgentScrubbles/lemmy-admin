@@ -727,6 +727,11 @@ export const Users: React.FC = () => {
             setRecentContent(null);
             setBehaviorAnalysis(null);
             setCommunityFilter('all');
+            // Reset AI summary state
+            setAiSummary(null);
+            setAiGenerating(false);
+            setAiProgress('');
+            setAiError(null);
           }}
           color="primary"
           variant="outlined"

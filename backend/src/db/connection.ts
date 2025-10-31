@@ -43,9 +43,10 @@ class Database {
           ssl: sslObject,
           max: config.database.maxConnections,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
+          connectionTimeoutMillis: 4000,
           // Note: Some managed PostgreSQL services don't support the options parameter
           // We'll enforce read-only at the query level instead
+          // Query timeout is set to 60 seconds below
         }
       : {
           host: config.database.host,
@@ -55,9 +56,9 @@ class Database {
           password: config.database.password,
           max: config.database.maxConnections,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
-          // Set default transaction to READ ONLY
-          options: '-c default_transaction_read_only=on',
+          connectionTimeoutMillis: 4000,
+          // Set default transaction to READ ONLY and statement timeout to 60 seconds
+          options: '-c default_transaction_read_only=on -c statement_timeout=60000',
         };
 
     console.log('Database pool config:', {
@@ -72,6 +73,17 @@ class Database {
     this.pool.on('error', (err) => {
       console.error('Unexpected error on idle client', err);
     });
+
+    // Set statement timeout on connect for connection string mode
+    if (finalConnectionString) {
+      this.pool.on('connect', async (client) => {
+        try {
+          await client.query('SET statement_timeout = 60000');
+        } catch (error) {
+          console.warn('Could not set statement_timeout:', error);
+        }
+      });
+    }
 
     // Verify read-only mode on pool initialization
     this.verifyReadOnlyMode();
