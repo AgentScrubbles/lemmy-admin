@@ -215,17 +215,62 @@ router.get('/:userId/voting-patterns', async (req: Request, res: Response) => {
     const downvotesGiven = result.rows.reduce((sum, row) => sum + parseInt(row.downvotes_given), 0);
     const totalVotes = result.rows.reduce((sum, row) => sum + parseInt(row.total_votes), 0);
 
-    // Get votes RECEIVED on user's content (from person_aggregates table)
-    const receivedQuery = await db.query(
-      `SELECT post_score, comment_score FROM person_aggregates WHERE person_id = $1`,
-      [userId]
-    );
+    // Get votes RECEIVED on user's content (aggregate from individual posts/comments)
+    const receivedPostsQuery = communityId
+      ? await db.query(
+          `SELECT
+            COALESCE(SUM(pa.upvotes), 0) as post_upvotes,
+            COALESCE(SUM(pa.downvotes), 0) as post_downvotes,
+            COALESCE(SUM(pa.score), 0) as post_score
+          FROM post p
+          JOIN post_aggregates pa ON pa.post_id = p.id
+          WHERE p.creator_id = $1 AND p.community_id = $2`,
+          [userId, communityId]
+        )
+      : await db.query(
+          `SELECT
+            COALESCE(SUM(pa.upvotes), 0) as post_upvotes,
+            COALESCE(SUM(pa.downvotes), 0) as post_downvotes,
+            COALESCE(SUM(pa.score), 0) as post_score
+          FROM post p
+          JOIN post_aggregates pa ON pa.post_id = p.id
+          WHERE p.creator_id = $1`,
+          [userId]
+        );
 
-    const userScores = receivedQuery.rows[0] || { post_score: 0, comment_score: 0 };
+    const receivedCommentsQuery = communityId
+      ? await db.query(
+          `SELECT
+            COALESCE(SUM(ca.upvotes), 0) as comment_upvotes,
+            COALESCE(SUM(ca.downvotes), 0) as comment_downvotes,
+            COALESCE(SUM(ca.score), 0) as comment_score
+          FROM comment c
+          JOIN comment_aggregates ca ON ca.comment_id = c.id
+          JOIN post p ON p.id = c.post_id
+          WHERE c.creator_id = $1 AND p.community_id = $2`,
+          [userId, communityId]
+        )
+      : await db.query(
+          `SELECT
+            COALESCE(SUM(ca.upvotes), 0) as comment_upvotes,
+            COALESCE(SUM(ca.downvotes), 0) as comment_downvotes,
+            COALESCE(SUM(ca.score), 0) as comment_score
+          FROM comment c
+          JOIN comment_aggregates ca ON ca.comment_id = c.id
+          WHERE c.creator_id = $1`,
+          [userId]
+        );
 
-    // Parse scores as integers to prevent string concatenation
-    const postScore = parseInt(userScores.post_score) || 0;
-    const commentScore = parseInt(userScores.comment_score) || 0;
+    const postVotes = receivedPostsQuery.rows[0] || { post_upvotes: 0, post_downvotes: 0, post_score: 0 };
+    const commentVotes = receivedCommentsQuery.rows[0] || { comment_upvotes: 0, comment_downvotes: 0, comment_score: 0 };
+
+    // Parse all values as integers
+    const postUpvotes = parseInt(postVotes.post_upvotes) || 0;
+    const postDownvotes = parseInt(postVotes.post_downvotes) || 0;
+    const postScore = parseInt(postVotes.post_score) || 0;
+    const commentUpvotes = parseInt(commentVotes.comment_upvotes) || 0;
+    const commentDownvotes = parseInt(commentVotes.comment_downvotes) || 0;
+    const commentScore = parseInt(commentVotes.comment_score) || 0;
 
     res.json({
       votesGiven: {
@@ -235,6 +280,17 @@ router.get('/:userId/voting-patterns', async (req: Request, res: Response) => {
         upvoteRate: totalVotes > 0 ? (upvotesGiven / totalVotes) : 0
       },
       votesReceived: {
+        posts: {
+          upvotes: postUpvotes,
+          downvotes: postDownvotes,
+          score: postScore
+        },
+        comments: {
+          upvotes: commentUpvotes,
+          downvotes: commentDownvotes,
+          score: commentScore
+        },
+        // Legacy fields for backward compatibility
         postScore: postScore,
         commentScore: commentScore,
         totalScore: postScore + commentScore

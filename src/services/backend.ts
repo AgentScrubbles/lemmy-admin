@@ -137,6 +137,17 @@ export interface VotingPatterns {
     upvoteRate: number;
   };
   votesReceived: {
+    posts: {
+      upvotes: number;
+      downvotes: number;
+      score: number;
+    };
+    comments: {
+      upvotes: number;
+      downvotes: number;
+      score: number;
+    };
+    // Legacy fields for backward compatibility
     postScore: number;
     commentScore: number;
     totalScore: number;

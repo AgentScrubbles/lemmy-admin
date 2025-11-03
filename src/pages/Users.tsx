@@ -584,8 +584,8 @@ export const Users: React.FC = () => {
   };
 
   // Prepare voting chart data - Posts and Comments separately
-  // Each chart shows Given (upvotes/downvotes) and Received (score)
-  // Downvotes and negative scores are shown as negative values (below axis)
+  // Each chart shows Given (upvotes/downvotes) and Received (upvotes/downvotes)
+  // Downvotes are shown as negative values (below axis)
 
   const postsVotingChartData = useMemo(() => {
     if (!votingPatterns) return [];
@@ -593,20 +593,21 @@ export const Users: React.FC = () => {
     // Approximate: split total votes given roughly 50/50 between posts and comments
     const givenUpvotes = Math.round(votingPatterns.votesGiven.upvotes * 0.5);
     const givenDownvotes = Math.round(votingPatterns.votesGiven.downvotes * 0.5);
-    const receivedScore = votingPatterns.votesReceived.postScore;
+
+    // Use actual received votes for posts
+    const receivedUpvotes = votingPatterns.votesReceived.posts.upvotes;
+    const receivedDownvotes = votingPatterns.votesReceived.posts.downvotes;
 
     return [
       {
         category: 'Given',
         Upvotes: givenUpvotes,
         Downvotes: -givenDownvotes, // Negative to show below axis
-        Score: null,
       },
       {
         category: 'Received',
-        Upvotes: null,
-        Downvotes: null,
-        Score: receivedScore, // Can be positive or negative
+        Upvotes: receivedUpvotes,
+        Downvotes: -receivedDownvotes, // Negative to show below axis
       },
     ];
   }, [votingPatterns]);
@@ -617,20 +618,21 @@ export const Users: React.FC = () => {
     // Approximate: split total votes given roughly 50/50 between posts and comments
     const givenUpvotes = Math.round(votingPatterns.votesGiven.upvotes * 0.5);
     const givenDownvotes = Math.round(votingPatterns.votesGiven.downvotes * 0.5);
-    const receivedScore = votingPatterns.votesReceived.commentScore;
+
+    // Use actual received votes for comments
+    const receivedUpvotes = votingPatterns.votesReceived.comments.upvotes;
+    const receivedDownvotes = votingPatterns.votesReceived.comments.downvotes;
 
     return [
       {
         category: 'Given',
         Upvotes: givenUpvotes,
         Downvotes: -givenDownvotes, // Negative to show below axis
-        Score: null,
       },
       {
         category: 'Received',
-        Upvotes: null,
-        Downvotes: null,
-        Score: receivedScore, // Can be positive or negative
+        Upvotes: receivedUpvotes,
+        Downvotes: -receivedDownvotes, // Negative to show below axis
       },
     ];
   }, [votingPatterns]);
@@ -1323,7 +1325,7 @@ export const Users: React.FC = () => {
                     Posts Voting Pattern
                   </Typography>
                   <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                    Green = upvotes/positive | Red = downvotes/negative | Given = votes by user | Received = score on user's posts
+                    Given = votes this user gave on others' posts | Received = votes this user's posts received | Downvotes shown below axis
                   </Typography>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={postsVotingChartData}>
@@ -1333,15 +1335,9 @@ export const Users: React.FC = () => {
                       <RechartsTooltip />
                       <Legend />
                       <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
-                      {/* Given votes */}
+                      {/* Upvotes (green, above axis) and Downvotes (red, below axis) */}
                       <Bar dataKey="Upvotes" fill="#4caf50" name="Upvotes" />
                       <Bar dataKey="Downvotes" fill="#f44336" name="Downvotes" />
-                      {/* Received score - will be green if positive, red if negative */}
-                      <Bar dataKey="Score" name="Score">
-                        {postsVotingChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.Score && entry.Score >= 0 ? '#66bb6a' : '#ef5350'} />
-                        ))}
-                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -1356,7 +1352,7 @@ export const Users: React.FC = () => {
                     Comments Voting Pattern
                   </Typography>
                   <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                    Green = upvotes/positive | Red = downvotes/negative | Given = votes by user | Received = score on user's comments
+                    Given = votes this user gave on others' comments | Received = votes this user's comments received | Downvotes shown below axis
                   </Typography>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={commentsVotingChartData}>
@@ -1366,15 +1362,9 @@ export const Users: React.FC = () => {
                       <RechartsTooltip />
                       <Legend />
                       <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
-                      {/* Given votes */}
+                      {/* Upvotes (green, above axis) and Downvotes (red, below axis) */}
                       <Bar dataKey="Upvotes" fill="#4caf50" name="Upvotes" />
                       <Bar dataKey="Downvotes" fill="#f44336" name="Downvotes" />
-                      {/* Received score - will be green if positive, red if negative */}
-                      <Bar dataKey="Score" name="Score">
-                        {commentsVotingChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.Score && entry.Score >= 0 ? '#66bb6a' : '#ef5350'} />
-                        ))}
-                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
