@@ -37,17 +37,26 @@ export const config = {
 } as const;
 
 // Validate required environment variables
-const requiredEnvVars = [
-  'DB_PASSWORD',
-  'LEMMY_INSTANCE_URL',
-];
+const requiredEnvVars: string[] = [];
 
-const missingEnvVars = requiredEnvVars.filter(
-  (envVar) => !process.env[envVar]
-);
+// Database: Either connection string OR individual parameters required
+if (!process.env.DB_CONNECTION_STRING) {
+  // If no connection string, require individual DB parameters
+  if (!process.env.DB_PASSWORD) {
+    requiredEnvVars.push('DB_PASSWORD');
+  }
+  if (!process.env.DB_HOST) {
+    requiredEnvVars.push('DB_HOST');
+  }
+}
 
-if (missingEnvVars.length > 0 && config.nodeEnv === 'production') {
+// Lemmy instance URL always required
+if (!process.env.LEMMY_INSTANCE_URL) {
+  requiredEnvVars.push('LEMMY_INSTANCE_URL');
+}
+
+if (requiredEnvVars.length > 0 && config.nodeEnv === 'production') {
   throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(', ')}`
+    `Missing required environment variables: ${requiredEnvVars.join(', ')}`
   );
 }
