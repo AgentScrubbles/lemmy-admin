@@ -1285,6 +1285,8 @@ export const Users: React.FC = () => {
                 </Box>
                 <Autocomplete
                   sx={{ minWidth: 350 }}
+                  freeSolo
+                  clearOnEscape
                   options={[
                     { id: 'all' as const, name: 'all', title: 'All Communities', instance_domain: '', subscribers: 0, posts: 0, comments: 0 },
                     ...communityBreakdown.map(cb => ({
@@ -1299,6 +1301,8 @@ export const Users: React.FC = () => {
                     ...communitySearchResults
                   ]}
                   value={
+                    // Clear value when user is typing to allow free input
+                    communitySearchTerm.length > 0 ? null :
                     communityFilter === 'all'
                       ? { id: 'all' as const, name: 'all', title: 'All Communities', instance_domain: '', subscribers: 0, posts: 0, comments: 0 }
                       : [...communityBreakdown.map(cb => ({
@@ -1312,23 +1316,41 @@ export const Users: React.FC = () => {
                         })), ...communitySearchResults].find(c => c.id === communityFilter) || null
                   }
                   onChange={(_, newValue) => {
+                    if (typeof newValue === 'string') {
+                      // User typed something - don't change filter, just search
+                      return;
+                    }
                     if (newValue) {
                       setCommunityFilter(newValue.id === 'all' ? 'all' : newValue.id);
+                      // Clear search term to show the selected value
+                      setCommunitySearchTerm('');
                     } else {
                       // When cleared, reset to "All Communities"
                       setCommunityFilter('all');
+                      setCommunitySearchTerm('');
                     }
                   }}
-                  onInputChange={(_, newInputValue) => {
-                    // Update search term as user types
-                    setCommunitySearchTerm(newInputValue);
+                  inputValue={communitySearchTerm}
+                  onInputChange={(_, newInputValue, reason) => {
+                    if (reason === 'input') {
+                      setCommunitySearchTerm(newInputValue);
+                    } else if (reason === 'reset') {
+                      // When option selected, clear search handled in onChange
+                      setCommunitySearchTerm('');
+                    } else if (reason === 'clear') {
+                      setCommunitySearchTerm('');
+                    }
                   }}
-                  getOptionLabel={(option) =>
-                    option.id === 'all'
+                  getOptionLabel={(option) => {
+                    if (typeof option === 'string') return option;
+                    return option.id === 'all'
                       ? 'All Communities'
-                      : `${option.name}@${option.instance_domain}`
-                  }
-                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                      : `${option.name}@${option.instance_domain}`;
+                  }}
+                  isOptionEqualToValue={(option, value) => {
+                    if (typeof option === 'string' || typeof value === 'string') return false;
+                    return option.id === value.id;
+                  }}
                   loading={searchingCommunities}
                   disabled={loading}
                   renderInput={(params) => (
@@ -1347,24 +1369,27 @@ export const Users: React.FC = () => {
                       }}
                     />
                   )}
-                  renderOption={(props, option) => (
-                    <li {...props} key={option.id}>
-                      <Box>
-                        <Typography>
-                          {option.id === 'all' ? (
-                            <strong>All Communities</strong>
-                          ) : (
-                            `${option.name}@${option.instance_domain}`
-                          )}
-                        </Typography>
-                        {option.id !== 'all' && (
-                          <Typography variant="caption" color="text.secondary">
-                            {option.title} • {(option.posts + option.comments).toLocaleString()} activities
+                  renderOption={(props, option) => {
+                    if (typeof option === 'string') return null;
+                    return (
+                      <li {...props} key={option.id}>
+                        <Box>
+                          <Typography>
+                            {option.id === 'all' ? (
+                              <strong>All Communities</strong>
+                            ) : (
+                              `${option.name}@${option.instance_domain}`
+                            )}
                           </Typography>
-                        )}
-                      </Box>
-                    </li>
-                  )}
+                          {option.id !== 'all' && (
+                            <Typography variant="caption" color="text.secondary">
+                              {option.title} • {(option.posts + option.comments).toLocaleString()} activities
+                            </Typography>
+                          )}
+                        </Box>
+                      </li>
+                    );
+                  }}
                 />
                 {loading && <CircularProgress size={24} />}
               </Box>
