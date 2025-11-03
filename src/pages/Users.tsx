@@ -1088,10 +1088,13 @@ export const Users: React.FC = () => {
                               <Typography variant="subtitle2">Positive Contributions</Typography>
                             </Box>
                             <Typography variant="body2">
-                              Total Content: {(userDetails.post_count + userDetails.comment_count).toLocaleString()}
+                              Total Content: {(userDetails.post_count + userDetails.comment_count).toLocaleString()} ({userDetails.post_count} posts, {userDetails.comment_count} comments)
                             </Typography>
                             <Typography variant="body2">
-                              Karma Earned: {votingPatterns.votesReceived.totalScore.toLocaleString()}
+                              Upvotes Received: {(votingPatterns.votesReceived.posts.upvotes + votingPatterns.votesReceived.comments.upvotes).toLocaleString()} ({votingPatterns.votesReceived.posts.upvotes} on posts, {votingPatterns.votesReceived.comments.upvotes} on comments)
+                            </Typography>
+                            <Typography variant="body2">
+                              Karma Earned: {votingPatterns.votesReceived.totalScore.toLocaleString()} ({votingPatterns.votesReceived.postScore} posts, {votingPatterns.votesReceived.commentScore} comments)
                             </Typography>
                             <Typography variant="body2">
                               Upvotes Given: {votingPatterns.votesGiven.upvotes.toLocaleString()}
@@ -1105,12 +1108,15 @@ export const Users: React.FC = () => {
                               <Typography variant="subtitle2">Negative Impact</Typography>
                             </Box>
                             <Typography variant="body2">
+                              Downvotes Received: {(votingPatterns.votesReceived.posts.downvotes + votingPatterns.votesReceived.comments.downvotes).toLocaleString()} ({votingPatterns.votesReceived.posts.downvotes} on posts, {votingPatterns.votesReceived.comments.downvotes} on comments)
+                            </Typography>
+                            <Typography variant="body2">
                               Downvotes Given: {votingPatterns.votesGiven.downvotes.toLocaleString()}
                             </Typography>
                             {behaviorAnalysis && (
                               <>
                                 <Typography variant="body2">
-                                  Negative Content: {(behaviorAnalysis.metrics.negativePosts + behaviorAnalysis.metrics.negativeComments).toLocaleString()}
+                                  Negative Content: {(behaviorAnalysis.metrics.negativePosts + behaviorAnalysis.metrics.negativeComments).toLocaleString()} ({behaviorAnalysis.metrics.negativePosts} posts, {behaviorAnalysis.metrics.negativeComments} comments)
                                 </Typography>
                                 <Typography variant="body2">
                                   Controversy Score: {behaviorAnalysis.metrics.avgControversy}%
