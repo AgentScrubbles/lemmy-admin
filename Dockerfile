@@ -24,8 +24,15 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Copy runtime environment scripts
+COPY env.sh /env.sh
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+
+# Make scripts executable
+RUN chmod +x /env.sh /docker-entrypoint.sh
+
 # Expose port 80
 EXPOSE 80
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Use custom entrypoint to generate runtime config
+ENTRYPOINT ["/docker-entrypoint.sh"]
