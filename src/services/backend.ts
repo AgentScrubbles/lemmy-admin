@@ -41,19 +41,19 @@ class BackendAPIService {
   // User Analytics Endpoints
 
   async getUserDetails(userId: number) {
-    const response = await this.api.get(`/api/users/${userId}/details`);
+    const response = await this.api.get(`/users/${userId}/details`);
     return response.data;
   }
 
   async getVotingPatterns(userId: number, communityId?: number) {
-    const response = await this.api.get(`/api/users/${userId}/voting-patterns`, {
+    const response = await this.api.get(`/users/${userId}/voting-patterns`, {
       params: communityId ? { communityId } : {},
     });
     return response.data;
   }
 
   async getActivityTimeline(userId: number, weeks: number = 12, communityId?: number) {
-    const response = await this.api.get(`/api/users/${userId}/activity-timeline`, {
+    const response = await this.api.get(`/users/${userId}/activity-timeline`, {
       params: {
         weeks,
         ...(communityId && { communityId }),
@@ -63,7 +63,7 @@ class BackendAPIService {
   }
 
   async getCommunityBreakdown(userId: number) {
-    const response = await this.api.get(`/api/users/${userId}/community-breakdown`);
+    const response = await this.api.get(`/users/${userId}/community-breakdown`);
     return response.data;
   }
 
@@ -75,33 +75,33 @@ class BackendAPIService {
       type?: 'posts' | 'comments';
     }
   ) {
-    const response = await this.api.get(`/api/users/${userId}/recent-content`, {
+    const response = await this.api.get(`/users/${userId}/recent-content`, {
       params: options || {},
     });
     return response.data;
   }
 
   async getBehaviorAnalysis(userId: number, communityId?: number) {
-    const response = await this.api.get(`/api/users/${userId}/behavior-analysis`, {
+    const response = await this.api.get(`/users/${userId}/behavior-analysis`, {
       params: communityId ? { communityId } : {},
     });
     return response.data;
   }
 
   async searchUsers(query: string, limit: number = 20) {
-    const response = await this.api.get(`/api/users/search/${encodeURIComponent(query)}`, {
+    const response = await this.api.get(`/users/search/${encodeURIComponent(query)}`, {
       params: { limit },
     });
     return response.data;
   }
 
   async lookupUserByHandle(userHandle: string) {
-    const response = await this.api.get(`/api/users/lookup/${encodeURIComponent(userHandle)}`);
+    const response = await this.api.get(`/users/lookup/${encodeURIComponent(userHandle)}`);
     return response.data;
   }
 
   async lookupCommunityByHandle(communityHandle: string) {
-    const response = await this.api.get(`/api/users/lookup-community/${encodeURIComponent(communityHandle)}`);
+    const response = await this.api.get(`/users/lookup-community/${encodeURIComponent(communityHandle)}`);
     return response.data;
   }
 }
