@@ -81,6 +81,7 @@ import {
   CommunityBreakdown,
   RecentContent,
   BehaviorAnalysis,
+  CommunitySearchResult,
 } from '../services/backend';
 import { lemmyService } from '../services/lemmy';
 import { openaiService } from '../services/openai';
@@ -139,6 +140,9 @@ export const Users: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [communityFilter, setCommunityFilter] = useState<number | 'all'>('all');
+  const [communitySearchTerm, setCommunitySearchTerm] = useState('');
+  const [communitySearchResults, setCommunitySearchResults] = useState<CommunitySearchResult[]>([]);
+  const [searchingCommunities, setSearchingCommunities] = useState(false);
 
   // Loading progress tracking
   interface LoadingStep {
@@ -372,6 +376,30 @@ export const Users: React.FC = () => {
 
     checkAiAvailability();
   }, []);
+
+  // Search communities when search term changes
+  useEffect(() => {
+    const searchCommunities = async () => {
+      if (!communitySearchTerm || communitySearchTerm.length < 2) {
+        setCommunitySearchResults([]);
+        return;
+      }
+
+      setSearchingCommunities(true);
+      try {
+        const results = await backendAPI.searchCommunities(communitySearchTerm, 20);
+        setCommunitySearchResults(results);
+      } catch (err) {
+        console.error('Error searching communities:', err);
+        setCommunitySearchResults([]);
+      } finally {
+        setSearchingCommunities(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchCommunities, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [communitySearchTerm]);
 
   // Auto-generate AI summary when user data is loaded
   useEffect(() => {
@@ -1259,34 +1287,86 @@ export const Users: React.FC = () => {
                     />
                   )}
                 </Box>
-                <FormControl sx={{ minWidth: 350 }}>
-                  <InputLabel>View Impact in Specific Community</InputLabel>
-                  <Select
-                    value={communityFilter}
-                    onChange={(e) => setCommunityFilter(e.target.value as number | 'all')}
-                    label="View Impact in Specific Community"
-                    disabled={loading}
-                  >
-                    <MenuItem value="all">
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Typography fontWeight="bold">All Communities</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          (Site-wide activity)
+                <Autocomplete
+                  sx={{ minWidth: 350 }}
+                  options={[
+                    { id: 'all' as const, name: 'all', title: 'All Communities', instance_domain: '', subscribers: 0, posts: 0, comments: 0 },
+                    ...communityBreakdown.map(cb => ({
+                      id: cb.community_id,
+                      name: cb.community_name,
+                      title: cb.community_title,
+                      instance_domain: cb.instance_domain,
+                      subscribers: 0,
+                      posts: parseInt(cb.post_count),
+                      comments: parseInt(cb.comment_count),
+                    })),
+                    ...communitySearchResults
+                  ]}
+                  value={
+                    communityFilter === 'all'
+                      ? { id: 'all' as const, name: 'all', title: 'All Communities', instance_domain: '', subscribers: 0, posts: 0, comments: 0 }
+                      : [...communityBreakdown.map(cb => ({
+                          id: cb.community_id,
+                          name: cb.community_name,
+                          title: cb.community_title,
+                          instance_domain: cb.instance_domain,
+                          subscribers: 0,
+                          posts: parseInt(cb.post_count),
+                          comments: parseInt(cb.comment_count),
+                        })), ...communitySearchResults].find(c => c.id === communityFilter) || null
+                  }
+                  onChange={(_, newValue) => {
+                    if (newValue) {
+                      setCommunityFilter(newValue.id === 'all' ? 'all' : newValue.id);
+                    }
+                  }}
+                  inputValue={communitySearchTerm}
+                  onInputChange={(_, newInputValue) => {
+                    setCommunitySearchTerm(newInputValue);
+                  }}
+                  getOptionLabel={(option) =>
+                    option.id === 'all'
+                      ? 'All Communities'
+                      : `${option.name}@${option.instance_domain}`
+                  }
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  loading={searchingCommunities}
+                  disabled={loading}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Search Community (name@instance)"
+                      placeholder="Type to search any community..."
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {searchingCommunities ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.id}>
+                      <Box>
+                        <Typography>
+                          {option.id === 'all' ? (
+                            <strong>All Communities</strong>
+                          ) : (
+                            `${option.name}@${option.instance_domain}`
+                          )}
                         </Typography>
-                      </Box>
-                    </MenuItem>
-                    {communityBreakdown.map((cb) => (
-                      <MenuItem key={cb.community_id} value={cb.community_id}>
-                        <Box>
-                          <Typography>{cb.community_name}@{cb.instance_domain}</Typography>
+                        {option.id !== 'all' && (
                           <Typography variant="caption" color="text.secondary">
-                            {parseInt(cb.post_count) + parseInt(cb.comment_count)} activities • Score: {parseInt(cb.post_score) + parseInt(cb.comment_score)}
+                            {option.title} • {(option.posts + option.comments).toLocaleString()} activities
                           </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                        )}
+                      </Box>
+                    </li>
+                  )}
+                />
                 {loading && <CircularProgress size={24} />}
               </Box>
               {communityFilter !== 'all' && (

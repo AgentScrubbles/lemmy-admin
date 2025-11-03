@@ -104,6 +104,13 @@ class BackendAPIService {
     const response = await this.api.get(`/users/lookup-community/${encodeURIComponent(communityHandle)}`);
     return response.data;
   }
+
+  async searchCommunities(query: string, limit: number = 20) {
+    const response = await this.api.get(`/users/search-communities/${encodeURIComponent(query)}`, {
+      params: { limit },
+    });
+    return response.data;
+  }
 }
 
 // Export singleton instance
@@ -221,4 +228,14 @@ export interface BehaviorAnalysis {
     negativeRate: number;
     avgControversy: number;
   };
+}
+
+export interface CommunitySearchResult {
+  id: number;
+  name: string;
+  title: string;
+  instance_domain: string;
+  subscribers: number;
+  posts: number;
+  comments: number;
 }

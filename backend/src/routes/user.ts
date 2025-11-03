@@ -62,6 +62,47 @@ router.get('/lookup/:userHandle', async (req: Request, res: Response) => {
   }
 });
 
+// Search communities by name
+router.get('/search-communities/:query', async (req: Request, res: Response) => {
+  try {
+    const query = decodeURIComponent(req.params.query);
+    const limit = parseInt(req.query.limit as string, 10) || 20;
+
+    if (!query || query.length < 1) {
+      res.json([]);
+      return;
+    }
+
+    // Search for communities matching the query
+    // Support both "asklemmy" and "asklemmy@lemmy.world" formats
+    const result = await db.query(
+      `SELECT
+        c.id,
+        c.name,
+        c.title,
+        i.domain as instance_domain,
+        cs.subscribers,
+        cs.posts,
+        cs.comments
+      FROM community c
+      JOIN instance i ON i.id = c.instance_id
+      LEFT JOIN community_aggregates cs ON cs.community_id = c.id
+      WHERE
+        LOWER(c.name) LIKE LOWER($1)
+        OR LOWER(c.title) LIKE LOWER($1)
+        OR LOWER(c.name || '@' || i.domain) LIKE LOWER($1)
+      ORDER BY cs.subscribers DESC NULLS LAST
+      LIMIT $2`,
+      [`%${query}%`, limit]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error searching communities:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Lookup community by handle (communityname@instance.tld)
 router.get('/lookup-community/:communityHandle', async (req: Request, res: Response) => {
   try {
