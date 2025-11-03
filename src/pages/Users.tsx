@@ -1314,14 +1314,13 @@ export const Users: React.FC = () => {
                   onChange={(_, newValue) => {
                     if (newValue) {
                       setCommunityFilter(newValue.id === 'all' ? 'all' : newValue.id);
-                      setCommunitySearchTerm('');
                     } else {
                       // When cleared, reset to "All Communities"
                       setCommunityFilter('all');
-                      setCommunitySearchTerm('');
                     }
                   }}
                   onInputChange={(_, newInputValue) => {
+                    // Update search term as user types
                     setCommunitySearchTerm(newInputValue);
                   }}
                   getOptionLabel={(option) =>
