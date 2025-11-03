@@ -583,7 +583,8 @@ export const Users: React.FC = () => {
   };
 
   // Prepare voting chart data
-  const votingChartData = useMemo(() => {
+  // Chart 1: Votes Given (by this user on others' content)
+  const votesGivenChartData = useMemo(() => {
     if (!votingPatterns) return [];
     return [
       {
@@ -591,10 +592,20 @@ export const Users: React.FC = () => {
         Upvotes: votingPatterns.votesGiven.upvotes,
         Downvotes: votingPatterns.votesGiven.downvotes,
       },
+    ];
+  }, [votingPatterns]);
+
+  // Chart 2: Votes Received (on this user's content) - Posts vs Comments
+  const votesReceivedChartData = useMemo(() => {
+    if (!votingPatterns) return [];
+    return [
       {
-        category: 'Votes Received',
-        Upvotes: Math.max(0, votingPatterns.votesReceived.postScore + votingPatterns.votesReceived.commentScore),
-        Downvotes: 0, // We don't have breakdown, just showing positive score
+        category: 'Posts',
+        Score: votingPatterns.votesReceived.postScore,
+      },
+      {
+        category: 'Comments',
+        Score: votingPatterns.votesReceived.commentScore,
       },
     ];
   }, [votingPatterns]);
@@ -1279,22 +1290,51 @@ export const Users: React.FC = () => {
               </Card>
             </Grid>
 
-            {/* Voting Patterns Bar Chart */}
+            {/* Votes Given Chart */}
             <Grid item xs={12} lg={6}>
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
-                    Voting Patterns Comparison
+                    Votes Given (by this user)
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                    Votes this user has given on others' content
                   </Typography>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={votingChartData}>
+                    <BarChart data={votesGivenChartData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="category" />
                       <YAxis />
                       <RechartsTooltip />
                       <Legend />
-                      <Bar dataKey="Upvotes" fill="#4caf50" />
-                      <Bar dataKey="Downvotes" fill="#f44336" />
+                      {/* Blue tones for "Given" */}
+                      <Bar dataKey="Upvotes" fill="#2196f3" name="Upvotes" />
+                      <Bar dataKey="Downvotes" fill="#1565c0" name="Downvotes" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Votes Received Chart - Posts vs Comments */}
+            <Grid item xs={12} lg={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Votes Received: Posts vs Comments
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                    Net score received on this user's content
+                  </Typography>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={votesReceivedChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="category" />
+                      <YAxis />
+                      <RechartsTooltip />
+                      <Legend />
+                      {/* Orange/Purple tones for "Received" */}
+                      <Bar dataKey="Score" fill="#ff9800" name="Score" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
