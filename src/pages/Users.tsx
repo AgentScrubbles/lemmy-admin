@@ -1285,6 +1285,8 @@ export const Users: React.FC = () => {
                 </Box>
                 <Autocomplete
                   sx={{ minWidth: 350 }}
+                  freeSolo={false}
+                  clearOnBlur
                   options={[
                     { id: 'all' as const, name: 'all', title: 'All Communities', instance_domain: '', subscribers: 0, posts: 0, comments: 0 },
                     ...communityBreakdown.map(cb => ({
@@ -1314,11 +1316,21 @@ export const Users: React.FC = () => {
                   onChange={(_, newValue) => {
                     if (newValue) {
                       setCommunityFilter(newValue.id === 'all' ? 'all' : newValue.id);
+                    } else {
+                      // When cleared, reset to "All Communities"
+                      setCommunityFilter('all');
                     }
                   }}
                   inputValue={communitySearchTerm}
-                  onInputChange={(_, newInputValue) => {
-                    setCommunitySearchTerm(newInputValue);
+                  onInputChange={(_, newInputValue, reason) => {
+                    // Allow typing when user clears or types
+                    if (reason === 'input' || reason === 'clear') {
+                      setCommunitySearchTerm(newInputValue);
+                    }
+                    // When user selects an option, clear the search term
+                    if (reason === 'reset') {
+                      setCommunitySearchTerm('');
+                    }
                   }}
                   getOptionLabel={(option) =>
                     option.id === 'all'
