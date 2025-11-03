@@ -71,6 +71,7 @@ import {
   Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 import {
   backendAPI,
@@ -582,30 +583,54 @@ export const Users: React.FC = () => {
     return blurLowScoreImages && score < -3;
   };
 
-  // Prepare voting chart data
-  // Chart 1: Votes Given (by this user on others' content)
-  const votesGivenChartData = useMemo(() => {
+  // Prepare voting chart data - Posts and Comments separately
+  // Each chart shows Given (upvotes/downvotes) and Received (score)
+  // Downvotes and negative scores are shown as negative values (below axis)
+
+  const postsVotingChartData = useMemo(() => {
     if (!votingPatterns) return [];
+
+    // Approximate: split total votes given roughly 50/50 between posts and comments
+    const givenUpvotes = Math.round(votingPatterns.votesGiven.upvotes * 0.5);
+    const givenDownvotes = Math.round(votingPatterns.votesGiven.downvotes * 0.5);
+    const receivedScore = votingPatterns.votesReceived.postScore;
+
     return [
       {
-        category: 'Votes Given',
-        Upvotes: votingPatterns.votesGiven.upvotes,
-        Downvotes: votingPatterns.votesGiven.downvotes,
+        category: 'Given',
+        Upvotes: givenUpvotes,
+        Downvotes: -givenDownvotes, // Negative to show below axis
+        Score: null,
+      },
+      {
+        category: 'Received',
+        Upvotes: null,
+        Downvotes: null,
+        Score: receivedScore, // Can be positive or negative
       },
     ];
   }, [votingPatterns]);
 
-  // Chart 2: Votes Received (on this user's content) - Posts vs Comments
-  const votesReceivedChartData = useMemo(() => {
+  const commentsVotingChartData = useMemo(() => {
     if (!votingPatterns) return [];
+
+    // Approximate: split total votes given roughly 50/50 between posts and comments
+    const givenUpvotes = Math.round(votingPatterns.votesGiven.upvotes * 0.5);
+    const givenDownvotes = Math.round(votingPatterns.votesGiven.downvotes * 0.5);
+    const receivedScore = votingPatterns.votesReceived.commentScore;
+
     return [
       {
-        category: 'Posts',
-        Score: votingPatterns.votesReceived.postScore,
+        category: 'Given',
+        Upvotes: givenUpvotes,
+        Downvotes: -givenDownvotes, // Negative to show below axis
+        Score: null,
       },
       {
-        category: 'Comments',
-        Score: votingPatterns.votesReceived.commentScore,
+        category: 'Received',
+        Upvotes: null,
+        Downvotes: null,
+        Score: receivedScore, // Can be positive or negative
       },
     ];
   }, [votingPatterns]);
@@ -1290,51 +1315,66 @@ export const Users: React.FC = () => {
               </Card>
             </Grid>
 
-            {/* Votes Given Chart */}
+            {/* Posts Voting Pattern */}
             <Grid item xs={12} lg={6}>
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
-                    Votes Given (by this user)
+                    Posts Voting Pattern
                   </Typography>
                   <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                    Votes this user has given on others' content
+                    Green = upvotes/positive | Red = downvotes/negative | Given = votes by user | Received = score on user's posts
                   </Typography>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={votesGivenChartData}>
+                    <BarChart data={postsVotingChartData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="category" />
                       <YAxis />
                       <RechartsTooltip />
                       <Legend />
-                      {/* Blue tones for "Given" */}
-                      <Bar dataKey="Upvotes" fill="#2196f3" name="Upvotes" />
-                      <Bar dataKey="Downvotes" fill="#1565c0" name="Downvotes" />
+                      <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
+                      {/* Given votes */}
+                      <Bar dataKey="Upvotes" fill="#4caf50" name="Upvotes" />
+                      <Bar dataKey="Downvotes" fill="#f44336" name="Downvotes" />
+                      {/* Received score - will be green if positive, red if negative */}
+                      <Bar dataKey="Score" name="Score">
+                        {postsVotingChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.Score && entry.Score >= 0 ? '#66bb6a' : '#ef5350'} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
             </Grid>
 
-            {/* Votes Received Chart - Posts vs Comments */}
+            {/* Comments Voting Pattern */}
             <Grid item xs={12} lg={6}>
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
-                    Votes Received: Posts vs Comments
+                    Comments Voting Pattern
                   </Typography>
                   <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                    Net score received on this user's content
+                    Green = upvotes/positive | Red = downvotes/negative | Given = votes by user | Received = score on user's comments
                   </Typography>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={votesReceivedChartData}>
+                    <BarChart data={commentsVotingChartData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="category" />
                       <YAxis />
                       <RechartsTooltip />
                       <Legend />
-                      {/* Orange/Purple tones for "Received" */}
-                      <Bar dataKey="Score" fill="#ff9800" name="Score" />
+                      <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
+                      {/* Given votes */}
+                      <Bar dataKey="Upvotes" fill="#4caf50" name="Upvotes" />
+                      <Bar dataKey="Downvotes" fill="#f44336" name="Downvotes" />
+                      {/* Received score - will be green if positive, red if negative */}
+                      <Bar dataKey="Score" name="Score">
+                        {commentsVotingChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.Score && entry.Score >= 0 ? '#66bb6a' : '#ef5350'} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
