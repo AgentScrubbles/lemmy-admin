@@ -417,6 +417,53 @@ export interface PurgeCommentResponse {
   success: boolean;
 }
 
+export interface RegisterRequest {
+  username: string;
+  password: string;
+  password_verify: string;
+  email?: string;
+  show_nsfw?: boolean;
+  captcha_uuid?: string;
+  captcha_answer?: string;
+  honeypot?: string;
+  answer?: string;
+}
+
+export interface CaptchaResponse {
+  ok?: {
+    png: string;
+    wav: string;
+    uuid: string;
+  };
+}
+
+export interface SaveUserSettingsRequest {
+  bot_account?: boolean;
+  display_name?: string;
+  bio?: string;
+  avatar?: string;
+  show_nsfw?: boolean;
+}
+
+export interface RegistrationApplicationView {
+  registration_application: {
+    id: number;
+    local_user_id: number;
+    answer: string;
+    admin_id?: number;
+    deny_reason?: string;
+    published: string;
+  };
+  creator_local_user: any;
+  creator: any;
+}
+
+export interface ApproveRegistrationRequest {
+  id: number;
+  approve: boolean;
+  deny_reason?: string;
+}
+
 class LemmyService {
   private api: AxiosInstance;
   private authToken: string | null = null;
@@ -534,6 +581,55 @@ class LemmyService {
 
   async purgeComment(data: PurgeCommentRequest): Promise<PurgeCommentResponse> {
     const response = await this.api.post<PurgeCommentResponse>('/admin/purge/comment', data);
+    return response.data;
+  }
+
+  async register(data: RegisterRequest): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>('/user/register', data);
+    return response.data;
+  }
+
+  async getCaptcha(): Promise<CaptchaResponse> {
+    const response = await this.api.get<CaptchaResponse>('/user/get_captcha');
+    return response.data;
+  }
+
+  async listRegistrationApplications(unread_only?: boolean): Promise<{ registration_applications: RegistrationApplicationView[] }> {
+    const response = await this.api.get<{ registration_applications: RegistrationApplicationView[] }>(
+      '/admin/registration_application/list',
+      { params: { unread_only } }
+    );
+    return response.data;
+  }
+
+  async approveRegistrationApplication(data: ApproveRegistrationRequest): Promise<any> {
+    const response = await this.api.put('/admin/registration_application/approve', data);
+    return response.data;
+  }
+
+  async saveUserSettingsWithToken(data: SaveUserSettingsRequest, token: string): Promise<any> {
+    const response = await axios.put(
+      `${config.lemmyInstanceUrl}/api/v3/user/save_user_settings`,
+      data,
+      { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  }
+
+  async uploadImageWithToken(file: File, token: string): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('images[]', file);
+    const response = await axios.post(
+      `${config.lemmyInstanceUrl}/pictrs/image`,
+      formData,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const imageUrl = `${config.lemmyInstanceUrl}/pictrs/image/${response.data.files[0].file}`;
+    return { url: imageUrl };
+  }
+
+  async loginRaw(credentials: LoginRequest): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>('/user/login', credentials);
     return response.data;
   }
 

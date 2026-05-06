@@ -10,6 +10,7 @@ import { Users } from './pages/Users';
 import { Communities } from './pages/Communities';
 import { Reports } from './pages/Reports';
 import { Modlog } from './pages/Modlog';
+import { CreateBot } from './pages/CreateBot';
 import { Unauthorized } from './pages/Unauthorized';
 
 const App: React.FC = () => {
@@ -46,6 +47,16 @@ const App: React.FC = () => {
                 <ProtectedRoute>
                   <Layout>
                     <Users />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bot/create"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CreateBot />
                   </Layout>
                 </ProtectedRoute>
               }

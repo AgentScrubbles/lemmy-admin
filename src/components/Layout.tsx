@@ -25,6 +25,7 @@ import {
   Groups as GroupsIcon,
   Report as ReportIcon,
   Gavel as GavelIcon,
+  SmartToy,
   Brightness4,
   Brightness7,
   AccountCircle,
@@ -49,6 +50,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Users', icon: <PeopleIcon />, path: '/users' },
+  { text: 'Create Bot', icon: <SmartToy />, path: '/bot/create' },
   { text: 'Communities', icon: <GroupsIcon />, path: '/communities' },
   { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
   { text: 'Modlog', icon: <GavelIcon />, path: '/modlog' },
