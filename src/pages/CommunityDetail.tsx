@@ -842,7 +842,7 @@ export const CommunityDetail: React.FC = () => {
 
               {/* Voters Table */}
               <Typography variant="subtitle2" gutterBottom>Voters</Typography>
-              <TableContainer sx={{ maxHeight: 300 }}>
+              <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
@@ -850,6 +850,7 @@ export const CommunityDetail: React.FC = () => {
                       <TableCell>Vote</TableCell>
                       <TableCell>When</TableCell>
                       <TableCell>Account Age</TableCell>
+                      <TableCell align="center">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -874,6 +875,20 @@ export const CommunityDetail: React.FC = () => {
                         </TableCell>
                         <TableCell>{formatTimeAgo(v.vote_time)}</TableCell>
                         <TableCell>{formatTimeAgo(v.account_created)}</TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Ban from community">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBanDialog({ personId: v.person_id, username: v.username });
+                              }}
+                            >
+                              <Gavel fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
