@@ -4,8 +4,6 @@ import {
   Box,
   Typography,
   Grid,
-  Card,
-  CardContent,
   CircularProgress,
   Alert,
   Chip,
@@ -117,7 +115,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
 export const CommunityDetail: React.FC = () => {
   const { communityHandle } = useParams<{ communityHandle: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  useAuth();
 
   const [communityView, setCommunityView] = useState<CommunityView | null>(null);
   const [loading, setLoading] = useState(true);
