@@ -176,7 +176,7 @@ class OpenAIService {
             content: `Summarize this user's recent activity on Lemmy:\n\nUsername: ${username}\n\n${sampledContent}`,
           },
         ],
-        max_tokens: 500,
+        max_tokens: 1000,
         temperature: 0.7,
       });
 
