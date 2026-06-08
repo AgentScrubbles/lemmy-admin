@@ -87,6 +87,7 @@ class OpenAIService {
         temperature: request.temperature ?? 0.7,
         max_tokens: request.max_tokens ?? 500,
         stream: false,
+        chat_template_kwargs: { enable_thinking: false },
       }),
     });
 
@@ -94,7 +95,17 @@ class OpenAIService {
       throw new Error(`OpenAI API error: ${response.statusText}`);
     }
 
-    return await response.json();
+    const data: OpenAIChatCompletionResponse = await response.json();
+
+    // Strip leaked reasoning tags from local models (e.g. Qwen thinking tokens)
+    if (data.choices?.[0]?.message?.content) {
+      data.choices[0].message.content = data.choices[0].message.content
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/<\/think>/g, '')
+        .trim();
+    }
+
+    return data;
   }
 
   /**
