@@ -87,7 +87,7 @@ class OpenAIService {
         temperature: request.temperature ?? 0.7,
         max_tokens: request.max_tokens ?? 500,
         stream: false,
-        chat_template_kwargs: { enable_thinking: false },
+        think: false,
       }),
     });
 
@@ -97,17 +97,12 @@ class OpenAIService {
 
     const data: OpenAIChatCompletionResponse = await response.json();
 
-    // Strip leaked reasoning from local models (e.g. Qwen thinking tokens, untagged analysis)
+    // Strip any leaked thinking tags (safety net)
     if (data.choices?.[0]?.message?.content) {
-      let content = data.choices[0].message.content;
-      // Remove XML thinking tags
-      content = content.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<\/think>/g, '');
-      // If model output a "## Summary" heading, keep only what follows it
-      const summaryMatch = content.match(/##\s*Summary\s*\n([\s\S]*)/i);
-      if (summaryMatch) {
-        content = summaryMatch[1];
-      }
-      data.choices[0].message.content = content.trim();
+      data.choices[0].message.content = data.choices[0].message.content
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/<\/think>/g, '')
+        .trim();
     }
 
     return data;
@@ -174,14 +169,14 @@ class OpenAIService {
         messages: [
           {
             role: 'system',
-            content: 'You are an AI assistant helping moderators understand user behavior patterns. Respond with ONLY the final summary paragraph — no analysis, no bullet points, no headings, no reasoning. Write a single concise paragraph (under 150 words) covering: main topics discussed, tone/sentiment, engagement level, and any notable patterns.',
+            content: 'You are an AI assistant helping moderators understand user behavior patterns. Provide concise, objective summaries focusing on: main topics discussed, tone/sentiment, engagement level, and any notable patterns. Keep it under 150 words.',
           },
           {
             role: 'user',
-            content: `Write a single short paragraph summarizing this user's recent activity on Lemmy. Do not include any analysis steps, bullet points, or section headers — just the summary paragraph.\n\nUsername: ${username}\n\n${sampledContent}`,
+            content: `Summarize this user's recent activity on Lemmy:\n\nUsername: ${username}\n\n${sampledContent}`,
           },
         ],
-        max_tokens: 400,
+        max_tokens: 500,
         temperature: 0.7,
       });
 
