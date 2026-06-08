@@ -97,12 +97,17 @@ class OpenAIService {
 
     const data: OpenAIChatCompletionResponse = await response.json();
 
-    // Strip leaked reasoning tags from local models (e.g. Qwen thinking tokens)
+    // Strip leaked reasoning from local models (e.g. Qwen thinking tokens, untagged analysis)
     if (data.choices?.[0]?.message?.content) {
-      data.choices[0].message.content = data.choices[0].message.content
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        .replace(/<\/think>/g, '')
-        .trim();
+      let content = data.choices[0].message.content;
+      // Remove XML thinking tags
+      content = content.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<\/think>/g, '');
+      // If model output a "## Summary" heading, keep only what follows it
+      const summaryMatch = content.match(/##\s*Summary\s*\n([\s\S]*)/i);
+      if (summaryMatch) {
+        content = summaryMatch[1];
+      }
+      data.choices[0].message.content = content.trim();
     }
 
     return data;
@@ -169,14 +174,14 @@ class OpenAIService {
         messages: [
           {
             role: 'system',
-            content: 'You are an AI assistant helping moderators understand user behavior patterns. Provide concise, objective summaries focusing on: main topics discussed, tone/sentiment, engagement level, and any notable patterns. Keep it under 150 words.',
+            content: 'You are an AI assistant helping moderators understand user behavior patterns. Respond with ONLY the final summary paragraph — no analysis, no bullet points, no headings, no reasoning. Write a single concise paragraph (under 150 words) covering: main topics discussed, tone/sentiment, engagement level, and any notable patterns.',
           },
           {
             role: 'user',
-            content: `Summarize this user's recent activity on Lemmy:\n\nUsername: ${username}\n\n${sampledContent}`,
+            content: `Write a single short paragraph summarizing this user's recent activity on Lemmy. Do not include any analysis steps, bullet points, or section headers — just the summary paragraph.\n\nUsername: ${username}\n\n${sampledContent}`,
           },
         ],
-        max_tokens: 300,
+        max_tokens: 400,
         temperature: 0.7,
       });
 
