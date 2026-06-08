@@ -111,6 +111,60 @@ class BackendAPIService {
     });
     return response.data;
   }
+
+  // Community Diagnostics Endpoints
+
+  async getCommunityDiagnosticsSummary(communityId: number): Promise<CommunityDiagnosticsSummary> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/summary`);
+    return response.data;
+  }
+
+  async getVoteBrigading(communityId: number, days: number = 30): Promise<VoteBrigadingPost[]> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/vote-brigading`, {
+      params: { days },
+    });
+    return response.data;
+  }
+
+  async getPostVoters(communityId: number, postId: number): Promise<PostVotersResponse> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/post/${postId}/voters`);
+    return response.data;
+  }
+
+  async getSerialDownvoters(communityId: number, days: number = 90): Promise<SerialDownvoter[]> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/serial-downvoters`, {
+      params: { days },
+    });
+    return response.data;
+  }
+
+  async getUserDownvoteHistory(communityId: number, userId: number, days: number = 90): Promise<UserDownvoteHistory> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/user/${userId}/downvote-history`, {
+      params: { days },
+    });
+    return response.data;
+  }
+
+  async getControversialPosts(communityId: number, days: number = 30): Promise<ControversialPost[]> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/controversial-posts`, {
+      params: { days },
+    });
+    return response.data;
+  }
+
+  async getHealthTrends(communityId: number, weeks: number = 12): Promise<HealthTrendPoint[]> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/health-trends`, {
+      params: { weeks },
+    });
+    return response.data;
+  }
+
+  async getTopContributors(communityId: number, days: number = 30): Promise<TopContributor[]> {
+    const response = await this.api.get(`/communities/${communityId}/diagnostics/top-contributors`, {
+      params: { days },
+    });
+    return response.data;
+  }
 }
 
 // Export singleton instance
@@ -238,4 +292,144 @@ export interface CommunitySearchResult {
   subscribers: number;
   posts: number;
   comments: number;
+}
+
+// Community Diagnostics Interfaces
+
+export interface CommunityDiagnosticsSummary {
+  engagementScore: number;
+  controversialCount: number;
+  downvoteRisk: number;
+  serialDownvoterCount: number;
+  recentAnomalyCount: number;
+  activePerWeek: number;
+  healthStatus: 'healthy' | 'watch' | 'at_risk';
+  redFlags: string[];
+}
+
+export interface VoteBrigadingPost {
+  post_id: number;
+  title: string;
+  published: string;
+  ap_id: string;
+  author_name: string;
+  author_id: number;
+  author_instance: string;
+  score: number;
+  upvotes: number;
+  downvotes: number;
+  upvote_ratio: number;
+  total_votes: number;
+  avg_votes: number;
+  anomaly: 'HIGH' | 'MED' | 'LOW';
+}
+
+export interface PostVoter {
+  person_id: number;
+  username: string;
+  instance_domain: string;
+  score: number;
+  vote_time: string;
+  account_created: string;
+  local: boolean;
+  bot_account: boolean;
+}
+
+export interface VoteTimelinePoint {
+  hour: string;
+  upvotes: number;
+  downvotes: number;
+}
+
+export interface PostVotersResponse {
+  post: {
+    id: number;
+    title: string;
+    published: string;
+    ap_id: string;
+    author_name: string;
+    author_id: number;
+    author_instance: string;
+    score: number;
+    upvotes: number;
+    downvotes: number;
+    comments: number;
+  };
+  voters: PostVoter[];
+  timeline: VoteTimelinePoint[];
+}
+
+export interface SerialDownvoter {
+  person_id: number;
+  username: string;
+  instance_domain: string;
+  account_created: string;
+  local: boolean;
+  banned: boolean;
+  total_downvotes: number;
+  total_upvotes: number;
+  unique_targets: number;
+  downvote_ratio: number;
+}
+
+export interface DownvoteTarget {
+  target_id: number;
+  target_name: string;
+  target_instance: string;
+  downvote_count: number;
+}
+
+export interface DownvotedContent {
+  content_type: 'post' | 'comment';
+  content_id: number;
+  title: string;
+  content_text: string | null;
+  author_name: string;
+  author_instance: string;
+  vote_time: string;
+  score: number;
+}
+
+export interface UserDownvoteHistory {
+  siteWide: {
+    downvotes: number;
+    upvotes: number;
+  };
+  targets: DownvoteTarget[];
+  recentDownvotes: DownvotedContent[];
+}
+
+export interface ControversialPost {
+  post_id: number;
+  title: string;
+  published: string;
+  ap_id: string;
+  author_name: string;
+  author_id: number;
+  author_instance: string;
+  score: number;
+  upvotes: number;
+  downvotes: number;
+  comments: number;
+  controversy_score: number;
+}
+
+export interface HealthTrendPoint {
+  week: string;
+  posts: number;
+  comments: number;
+  uniquePosters: number;
+  uniqueCommenters: number;
+  upvotes: number;
+  downvotes: number;
+}
+
+export interface TopContributor {
+  person_id: number;
+  username: string;
+  instance_domain: string;
+  avatar: string | null;
+  post_count: number;
+  comment_count: number;
+  total_activity: number;
 }

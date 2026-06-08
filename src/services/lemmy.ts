@@ -417,6 +417,20 @@ export interface PurgeCommentResponse {
   success: boolean;
 }
 
+export interface BanFromCommunityRequest {
+  community_id: number;
+  person_id: number;
+  ban: boolean;
+  remove_data?: boolean;
+  reason?: string;
+  expires?: number; // Unix timestamp
+}
+
+export interface BanFromCommunityResponse {
+  person_view: PersonView;
+  banned: boolean;
+}
+
 export interface RegisterRequest {
   username: string;
   password: string;
@@ -566,6 +580,11 @@ class LemmyService {
 
   async removeComment(data: RemoveCommentRequest): Promise<RemoveCommentResponse> {
     const response = await this.api.post<RemoveCommentResponse>('/comment/remove', data);
+    return response.data;
+  }
+
+  async banFromCommunity(data: BanFromCommunityRequest): Promise<BanFromCommunityResponse> {
+    const response = await this.api.post<BanFromCommunityResponse>('/community/ban_user', data);
     return response.data;
   }
 

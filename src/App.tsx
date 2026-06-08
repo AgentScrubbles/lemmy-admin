@@ -10,6 +10,7 @@ import { Users } from './pages/Users';
 import { Communities } from './pages/Communities';
 import { Reports } from './pages/Reports';
 import { Modlog } from './pages/Modlog';
+import { CommunityDetail } from './pages/CommunityDetail';
 import { CreateBot } from './pages/CreateBot';
 import { Unauthorized } from './pages/Unauthorized';
 
@@ -67,6 +68,16 @@ const App: React.FC = () => {
                 <ProtectedRoute>
                   <Layout>
                     <Communities />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/communities/:communityHandle"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CommunityDetail />
                   </Layout>
                 </ProtectedRoute>
               }

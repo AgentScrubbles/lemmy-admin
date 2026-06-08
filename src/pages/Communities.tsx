@@ -18,6 +18,8 @@ import {
   TableHead,
   TableRow,
   Link as MuiLink,
+  Button,
+  Skeleton,
 } from '@mui/material';
 import {
   People,
@@ -27,17 +29,39 @@ import {
   Public,
   Lock,
   VisibilityOff,
+  CheckCircle,
+  Warning,
+  Error as ErrorIcon,
+  ArrowForward,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { lemmyService, CommunityView, GetPostsResponse } from '../services/lemmy';
+import { backendAPI, CommunityDiagnosticsSummary } from '../services/backend';
 import { config } from '../config';
 
 interface CommunityWithStats extends CommunityView {
   recentPosts?: GetPostsResponse;
+  diagnostics?: CommunityDiagnosticsSummary;
+  diagnosticsLoading?: boolean;
 }
+
+const healthChipProps = (status: string) => {
+  switch (status) {
+    case 'healthy':
+      return { icon: <CheckCircle />, label: 'Healthy', color: 'success' as const };
+    case 'watch':
+      return { icon: <Warning />, label: 'Watch', color: 'warning' as const };
+    case 'at_risk':
+      return { icon: <ErrorIcon />, label: 'At Risk', color: 'error' as const };
+    default:
+      return { icon: <CheckCircle />, label: 'Unknown', color: 'default' as const };
+  }
+};
 
 export const Communities: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [communities, setCommunities] = useState<CommunityWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,14 +76,12 @@ export const Communities: React.FC = () => {
       try {
         setLoading(true);
 
-        // Fetch detailed data for each moderated community
         const communityPromises = user.moderates.map(async (modView) => {
           try {
             const communityData = await lemmyService.getCommunity({
               id: modView.community.id,
             });
 
-            // Fetch recent posts for this community
             const recentPosts = await lemmyService.getPosts({
               community_id: modView.community.id,
               limit: 5,
@@ -69,7 +91,8 @@ export const Communities: React.FC = () => {
             return {
               ...communityData.community_view,
               recentPosts,
-            };
+              diagnosticsLoading: true,
+            } as CommunityWithStats;
           } catch (err) {
             console.error(`Error fetching data for community ${modView.community.name}:`, err);
             return null;
@@ -77,11 +100,26 @@ export const Communities: React.FC = () => {
         });
 
         const communityData = await Promise.all(communityPromises);
-        const validCommunities: CommunityWithStats[] = communityData.filter(
+        const validCommunities = communityData.filter(
           (c) => c !== null
         ) as CommunityWithStats[];
         setCommunities(validCommunities);
         setError(null);
+
+        // Fetch diagnostics in parallel after initial render
+        validCommunities.forEach(async (cv, idx) => {
+          try {
+            const diagnostics = await backendAPI.getCommunityDiagnosticsSummary(cv.community.id);
+            setCommunities(prev => prev.map((c, i) =>
+              i === idx ? { ...c, diagnostics, diagnosticsLoading: false } : c
+            ));
+          } catch (err) {
+            console.error(`Error fetching diagnostics for ${cv.community.name}:`, err);
+            setCommunities(prev => prev.map((c, i) =>
+              i === idx ? { ...c, diagnosticsLoading: false } : c
+            ));
+          }
+        });
       } catch (err) {
         console.error('Error fetching community data:', err);
         setError('Failed to load community data');
@@ -133,8 +171,10 @@ export const Communities: React.FC = () => {
 
       <Grid container spacing={3} sx={{ mt: 1 }}>
         {communities.map((communityView) => {
-          const { community, counts } = communityView;
+          const { community, counts, diagnostics, diagnosticsLoading } = communityView;
           const communityUrl = `${config.lemmyInstanceUrl}/c/${community.name}`;
+          const instanceDomain = new URL(config.lemmyInstanceUrl).hostname;
+          const communityHandle = `${community.name}@${instanceDomain}`;
 
           return (
             <Grid item xs={12} key={community.id}>
@@ -185,7 +225,7 @@ export const Communities: React.FC = () => {
                               {community.description}
                             </Typography>
                           )}
-                          <Box display="flex" gap={1} mt={1}>
+                          <Box display="flex" gap={1} mt={1} flexWrap="wrap">
                             {community.local ? (
                               <Chip icon={<Public />} label="Local" size="small" />
                             ) : (
@@ -199,6 +239,15 @@ export const Communities: React.FC = () => {
                                 variant="outlined"
                               />
                             )}
+                            {diagnosticsLoading ? (
+                              <Skeleton width={80} height={24} />
+                            ) : diagnostics ? (
+                              <Chip
+                                {...healthChipProps(diagnostics.healthStatus)}
+                                size="small"
+                                variant="filled"
+                              />
+                            ) : null}
                           </Box>
                         </Box>
                       </Box>
@@ -250,6 +299,38 @@ export const Communities: React.FC = () => {
                           </Paper>
                         </Grid>
                       </Grid>
+
+                      {/* Diagnostics mini-stats */}
+                      {diagnostics && (
+                        <Box mt={2} display="flex" gap={2} flexWrap="wrap" alignItems="center">
+                          <Chip
+                            label={`${diagnostics.activePerWeek} active/wk`}
+                            size="small"
+                            variant="outlined"
+                          />
+                          <Chip
+                            label={`${diagnostics.controversialCount} controversial`}
+                            size="small"
+                            variant="outlined"
+                            color={diagnostics.controversialCount > 5 ? 'error' : diagnostics.controversialCount > 3 ? 'warning' : 'default'}
+                          />
+                          <Chip
+                            label={`${diagnostics.downvoteRisk}% downvote risk`}
+                            size="small"
+                            variant="outlined"
+                            color={diagnostics.downvoteRisk > 25 ? 'error' : diagnostics.downvoteRisk > 10 ? 'warning' : 'default'}
+                          />
+                          <Box flexGrow={1} />
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            endIcon={<ArrowForward />}
+                            onClick={() => navigate(`/communities/${communityHandle}`)}
+                          >
+                            Diagnostics
+                          </Button>
+                        </Box>
+                      )}
 
                       {/* Active Users Over Time */}
                       <Box mt={2}>

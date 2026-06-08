@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config';
 import { db } from './db/connection';
 import userRoutes from './routes/user';
+import communityRoutes from './routes/community';
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.get('/health', async (req: Request, res: Response) => {
 
 // API Routes
 app.use('/api/users', userRoutes);
+app.use('/api/communities', communityRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
