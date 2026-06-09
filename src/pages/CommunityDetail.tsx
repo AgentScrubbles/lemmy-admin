@@ -49,7 +49,7 @@ import {
   Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
-import { lemmyService, CommunityView } from '../services/lemmy';
+import { lemmyService, CommunityView, PostView, CommentView } from '../services/lemmy';
 import {
   backendAPI,
   CommunityDiagnosticsSummary,
@@ -139,6 +139,11 @@ export const CommunityDetail: React.FC = () => {
   const [healthLoading, setHealthLoading] = useState(false);
   const [topContributors, setTopContributors] = useState<TopContributor[] | null>(null);
 
+  // Recent content
+  const [recentPosts, setRecentPosts] = useState<PostView[] | null>(null);
+  const [recentComments, setRecentComments] = useState<CommentView[] | null>(null);
+  const [recentLoading, setRecentLoading] = useState(false);
+
   // Dialogs
   const [voterDialog, setVoterDialog] = useState<PostVotersResponse | null>(null);
   const [voterLoading, setVoterLoading] = useState(false);
@@ -193,6 +198,27 @@ export const CommunityDetail: React.FC = () => {
   useEffect(() => {
     if (communityId) loadSummary();
   }, [communityId, loadSummary]);
+
+  // Load recent posts and comments
+  useEffect(() => {
+    if (!communityId) return;
+    const loadRecent = async () => {
+      setRecentLoading(true);
+      try {
+        const [postsRes, commentsRes] = await Promise.all([
+          lemmyService.getPosts({ community_id: communityId, limit: 20, sort: 'New' }),
+          lemmyService.getComments({ community_id: communityId, limit: 20, sort: 'New' }),
+        ]);
+        setRecentPosts(postsRes.posts);
+        setRecentComments(commentsRes.comments);
+      } catch (err) {
+        console.error('Error loading recent content:', err);
+      } finally {
+        setRecentLoading(false);
+      }
+    };
+    loadRecent();
+  }, [communityId]);
 
   // Lazy load tab data
   const loadBrigading = useCallback(async () => {
@@ -455,6 +481,156 @@ export const CommunityDetail: React.FC = () => {
                 ))
               )}
             </Paper>
+
+            {/* Recent Posts */}
+            <Typography variant="h6" gutterBottom>Recent Posts</Typography>
+            {recentLoading ? <LinearProgress sx={{ mb: 2 }} /> : recentPosts && recentPosts.length > 0 ? (
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Title</TableCell>
+                      <TableCell>Author</TableCell>
+                      <TableCell align="right">Score</TableCell>
+                      <TableCell align="right">Up</TableCell>
+                      <TableCell align="right">Down</TableCell>
+                      <TableCell align="right">Comments</TableCell>
+                      <TableCell>Posted</TableCell>
+                      <TableCell align="center">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {recentPosts.map((pv) => (
+                      <TableRow key={pv.post.id} hover>
+                        <TableCell
+                          sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                          onClick={() => openVoterDialog(pv.post.id)}
+                        >
+                          <Tooltip title="View voters">
+                            <span>{pv.post.name}</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell>
+                          <MuiLink
+                            component="button"
+                            variant="body2"
+                            onClick={() => navigate(`/users/${pv.creator.name}@${new URL(pv.creator.actor_id).hostname}`)}
+                          >
+                            @{pv.creator.name}
+                          </MuiLink>
+                        </TableCell>
+                        <TableCell align="right">{pv.counts.score}</TableCell>
+                        <TableCell align="right">{pv.counts.upvotes}</TableCell>
+                        <TableCell align="right">{pv.counts.downvotes}</TableCell>
+                        <TableCell align="right">{pv.counts.comments}</TableCell>
+                        <TableCell>{formatTimeAgo(pv.post.published)}</TableCell>
+                        <TableCell align="center">
+                          <Box display="flex" gap={0.5} justifyContent="center">
+                            <Tooltip title="View on Lemmy">
+                              <IconButton
+                                size="small"
+                                href={`${config.lemmyInstanceUrl}/post/${pv.post.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <OpenInNew fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Ban author from community">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => setBanDialog({ personId: pv.creator.id, username: pv.creator.name })}
+                              >
+                                <Gavel fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>No recent posts</Typography>
+            )}
+
+            {/* Recent Comments */}
+            <Typography variant="h6" gutterBottom>Recent Comments</Typography>
+            {recentLoading ? <LinearProgress sx={{ mb: 2 }} /> : recentComments && recentComments.length > 0 ? (
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Comment</TableCell>
+                      <TableCell>Author</TableCell>
+                      <TableCell>Post</TableCell>
+                      <TableCell align="right">Score</TableCell>
+                      <TableCell align="right">Up</TableCell>
+                      <TableCell align="right">Down</TableCell>
+                      <TableCell>Posted</TableCell>
+                      <TableCell align="center">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {recentComments.map((cv) => (
+                      <TableRow key={cv.comment.id} hover>
+                        <TableCell sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {cv.comment.content.length > 100 ? cv.comment.content.substring(0, 100) + '...' : cv.comment.content}
+                        </TableCell>
+                        <TableCell>
+                          <MuiLink
+                            component="button"
+                            variant="body2"
+                            onClick={() => navigate(`/users/${cv.creator.name}@${new URL(cv.creator.actor_id).hostname}`)}
+                          >
+                            @{cv.creator.name}
+                          </MuiLink>
+                        </TableCell>
+                        <TableCell
+                          sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                          onClick={() => openVoterDialog(cv.post.id)}
+                        >
+                          <Tooltip title="View post voters">
+                            <span>{cv.post.name}</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="right">{cv.counts.score}</TableCell>
+                        <TableCell align="right">{cv.counts.upvotes}</TableCell>
+                        <TableCell align="right">{cv.counts.downvotes}</TableCell>
+                        <TableCell>{formatTimeAgo(cv.comment.published)}</TableCell>
+                        <TableCell align="center">
+                          <Box display="flex" gap={0.5} justifyContent="center">
+                            <Tooltip title="View on Lemmy">
+                              <IconButton
+                                size="small"
+                                href={`${config.lemmyInstanceUrl}/comment/${cv.comment.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <OpenInNew fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Ban author from community">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => setBanDialog({ personId: cv.creator.id, username: cv.creator.name })}
+                              >
+                                <Gavel fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>No recent comments</Typography>
+            )}
           </Box>
         ) : (
           <Alert severity="warning">Failed to load diagnostics summary</Alert>
