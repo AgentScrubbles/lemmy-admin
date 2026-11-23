@@ -4,6 +4,7 @@ import { config } from './config';
 import { db } from './db/connection';
 import userRoutes from './routes/user';
 import communityRoutes from './routes/community';
+import threativoreRoutes from './routes/threativore';
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.get('/health', async (req: Request, res: Response) => {
 // API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/communities', communityRoutes);
+app.use('/api/threativore', threativoreRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

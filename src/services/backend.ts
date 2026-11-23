@@ -165,6 +165,46 @@ class BackendAPIService {
     });
     return response.data;
   }
+  // Threativore Endpoints
+
+  async getThreativoreUser(username: string): Promise<ThreativoreUser> {
+    const response = await this.api.get(`/threativore/user/${encodeURIComponent(username)}`);
+    return response.data;
+  }
+
+  async createThreativoreUser(username: string, data: ThreativoreUserPayload): Promise<ThreativoreUser> {
+    const response = await this.api.put(`/threativore/user/${encodeURIComponent(username)}`, data);
+    return response.data;
+  }
+
+  async updateThreativoreUser(username: string, data: ThreativoreUserPayload): Promise<ThreativoreUser> {
+    const response = await this.api.patch(`/threativore/user/${encodeURIComponent(username)}`, data);
+    return response.data;
+  }
+
+  async deleteThreativoreUser(username: string): Promise<void> {
+    await this.api.delete(`/threativore/user/${encodeURIComponent(username)}`);
+  }
+
+  async getThreativoreTag(tag: string): Promise<ThreativoreTagUsers> {
+    const response = await this.api.get(`/threativore/tag/${encodeURIComponent(tag)}`);
+    return response.data;
+  }
+
+  async addThreativoreTag(tag: string, data: ThreativoreTagPayload): Promise<any> {
+    const response = await this.api.post(`/threativore/tag/${encodeURIComponent(tag)}`, data);
+    return response.data;
+  }
+
+  async removeThreativoreTag(tag: string, data: ThreativoreTagPayload): Promise<any> {
+    const response = await this.api.delete(`/threativore/tag/${encodeURIComponent(tag)}`, { data });
+    return response.data;
+  }
+
+  async getOpenVotes(): Promise<ThreativoreOpenVote[]> {
+    const response = await this.api.get('/threativore/votes');
+    return response.data;
+  }
 }
 
 // Export singleton instance
@@ -432,4 +472,50 @@ export interface TopContributor {
   post_count: number;
   comment_count: number;
   total_activity: number;
+}
+
+// Threativore interfaces
+
+export interface ThreativoreTag {
+  tag: string;
+  value: string | null;
+  flair: string | null;
+  expires: string | null;
+  description: string | null;
+}
+
+export interface ThreativoreUser {
+  user_url: string;
+  roles: string[];
+  tags: ThreativoreTag[];
+  aliases: string[];
+  override: string | null;
+}
+
+export interface ThreativoreUserPayload {
+  tags?: Array<{ tag: string; value?: string; expires?: string }>;
+  roles?: string[];
+  delete_unspecified_values?: boolean;
+}
+
+export interface ThreativoreTagPayload {
+  username: string;
+  value?: string;
+  expires?: string;
+}
+
+export interface ThreativoreTagUsers {
+  tag: string;
+  users: Array<{
+    username: string;
+    value: string | null;
+    expires: string | null;
+  }>;
+}
+
+export interface ThreativoreOpenVote {
+  post_url: string;
+  type: string;
+  user: string;
+  expires: string;
 }

@@ -26,6 +26,7 @@ import {
   Report as ReportIcon,
   Gavel as GavelIcon,
   SmartToy,
+  HowToVote,
   Brightness4,
   Brightness7,
   AccountCircle,
@@ -54,6 +55,7 @@ const menuItems: MenuItem[] = [
   { text: 'Communities', icon: <GroupsIcon />, path: '/communities' },
   { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
   { text: 'Modlog', icon: <GavelIcon />, path: '/modlog' },
+  { text: 'Open Votes', icon: <HowToVote />, path: '/votes' },
 ];
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {

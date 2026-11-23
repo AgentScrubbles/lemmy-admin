@@ -52,6 +52,10 @@ import {
   Delete,
   RemoveCircle,
   Restore,
+  Security,
+  Add,
+  PersonAdd,
+  PersonRemove,
 } from '@mui/icons-material';
 import {
   LineChart,
@@ -78,6 +82,8 @@ import {
   RecentContent,
   BehaviorAnalysis,
   CommunitySearchResult,
+  ThreativoreUser,
+  ThreativoreTag,
 } from '../services/backend';
 import { lemmyService } from '../services/lemmy';
 import { openaiService } from '../services/openai';
@@ -186,6 +192,129 @@ export const Users: React.FC = () => {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiProgress, setAiProgress] = useState('');
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Threativore moderation state
+  const [threativoreUser, setThreativoreUser] = useState<ThreativoreUser | null>(null);
+  const [threativoreLoading, setThreativoreLoading] = useState(false);
+  const [threativoreNotFound, setThreativoreNotFound] = useState(false);
+  const [threativoreError, setThreativoreError] = useState<string | null>(null);
+  const [addTagDialogOpen, setAddTagDialogOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagValue, setNewTagValue] = useState('');
+  const [newTagExpires, setNewTagExpires] = useState('');
+
+  // Load Threativore data when user is selected
+  const loadThreativoreUser = async (handle: string) => {
+    setThreativoreLoading(true);
+    setThreativoreError(null);
+    setThreativoreNotFound(false);
+    setThreativoreUser(null);
+    try {
+      const data = await backendAPI.getThreativoreUser(handle);
+      setThreativoreUser(data);
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setThreativoreNotFound(true);
+      } else if (err.response?.status === 503) {
+        setThreativoreError('Threativore not configured');
+      } else {
+        setThreativoreError('Failed to load moderation data');
+      }
+    } finally {
+      setThreativoreLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedUserHandle) {
+      loadThreativoreUser(selectedUserHandle);
+    }
+  }, [selectedUserHandle]);
+
+  const handleAddToThreativore = async () => {
+    if (!selectedUserHandle) return;
+    setActionLoading(true);
+    try {
+      const data = await backendAPI.createThreativoreUser(selectedUserHandle, {});
+      setThreativoreUser(data);
+      setThreativoreNotFound(false);
+      setSuccess('User added to Threativore');
+    } catch (err) {
+      setError('Failed to add user to Threativore');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteFromThreativore = async () => {
+    if (!selectedUserHandle) return;
+    if (!window.confirm('Remove this user from Threativore? Their tags and roles will be lost.')) return;
+    setActionLoading(true);
+    try {
+      await backendAPI.deleteThreativoreUser(selectedUserHandle);
+      setThreativoreUser(null);
+      setThreativoreNotFound(true);
+      setSuccess('User removed from Threativore');
+    } catch (err) {
+      setError('Failed to remove user from Threativore');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToggleRole = async (role: string) => {
+    if (!selectedUserHandle || !threativoreUser) return;
+    setActionLoading(true);
+    try {
+      const hasRole = threativoreUser.roles.includes(role);
+      const newRoles = hasRole
+        ? threativoreUser.roles.filter(r => r !== role)
+        : [...threativoreUser.roles, role];
+      const data = await backendAPI.updateThreativoreUser(selectedUserHandle, { roles: newRoles });
+      setThreativoreUser(data);
+      setSuccess(`Role ${role} ${hasRole ? 'removed' : 'added'}`);
+    } catch (err) {
+      setError(`Failed to toggle role ${role}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAddTag = async () => {
+    if (!selectedUserHandle || !newTagName.trim()) return;
+    setActionLoading(true);
+    try {
+      await backendAPI.addThreativoreTag(newTagName.trim(), {
+        username: selectedUserHandle,
+        ...(newTagValue && { value: newTagValue }),
+        ...(newTagExpires && { expires: newTagExpires }),
+      });
+      await loadThreativoreUser(selectedUserHandle);
+      setAddTagDialogOpen(false);
+      setNewTagName('');
+      setNewTagValue('');
+      setNewTagExpires('');
+      setSuccess(`Tag "${newTagName}" added`);
+    } catch (err) {
+      setError(`Failed to add tag "${newTagName}"`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveTag = async (tag: ThreativoreTag) => {
+    if (!selectedUserHandle) return;
+    setActionLoading(true);
+    try {
+      await backendAPI.removeThreativoreTag(tag.tag, { username: selectedUserHandle });
+      await loadThreativoreUser(selectedUserHandle);
+      setSuccess(`Tag "${tag.tag}" removed`);
+    } catch (err) {
+      setError(`Failed to remove tag "${tag.tag}"`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Search for users with backend API
   useEffect(() => {
@@ -794,6 +923,10 @@ export const Users: React.FC = () => {
             setAiGenerating(false);
             setAiProgress('');
             setAiError(null);
+            // Reset Threativore state
+            setThreativoreUser(null);
+            setThreativoreNotFound(false);
+            setThreativoreError(null);
           }}
           color="primary"
           variant="outlined"
@@ -1264,6 +1397,170 @@ export const Users: React.FC = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Threativore Moderation Section */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <Security color="primary" />
+                <Typography variant="h6">Moderation (Threativore)</Typography>
+              </Box>
+              <Divider sx={{ mb: 2 }} />
+
+              {threativoreLoading && (
+                <Box display="flex" justifyContent="center" py={3}>
+                  <CircularProgress size={24} />
+                </Box>
+              )}
+
+              {threativoreError && (
+                <Alert severity="warning">{threativoreError}</Alert>
+              )}
+
+              {threativoreNotFound && !threativoreLoading && (
+                <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    This user is not tracked by Threativore.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<PersonAdd />}
+                    onClick={handleAddToThreativore}
+                    disabled={actionLoading}
+                  >
+                    Add to Threativore
+                  </Button>
+                </Box>
+              )}
+
+              {threativoreUser && !threativoreLoading && (
+                <Box>
+                  {/* Roles */}
+                  <Typography variant="subtitle2" gutterBottom>Roles</Typography>
+                  <Box display="flex" gap={1} mb={2} flexWrap="wrap" alignItems="center">
+                    {['MODERATOR', 'TRUSTED', 'ADMIN'].map(role => (
+                      <FormControlLabel
+                        key={role}
+                        control={
+                          <Switch
+                            checked={threativoreUser.roles.includes(role)}
+                            onChange={() => handleToggleRole(role)}
+                            disabled={actionLoading}
+                            size="small"
+                          />
+                        }
+                        label={role}
+                      />
+                    ))}
+                  </Box>
+
+                  {/* Tags */}
+                  <Typography variant="subtitle2" gutterBottom>Tags</Typography>
+                  <Box display="flex" gap={1} mb={2} flexWrap="wrap">
+                    {threativoreUser.tags.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">No tags</Typography>
+                    )}
+                    {threativoreUser.tags.map((tag, idx) => (
+                      <Tooltip
+                        key={idx}
+                        title={
+                          <>
+                            {tag.value && <div>Value: {tag.value}</div>}
+                            {tag.flair && <div>Flair: {tag.flair}</div>}
+                            {tag.expires && <div>Expires: {new Date(tag.expires).toLocaleString()}</div>}
+                            {tag.description && <div>{tag.description}</div>}
+                          </>
+                        }
+                      >
+                        <Chip
+                          label={tag.value ? `${tag.tag}: ${tag.value}` : tag.tag}
+                          onDelete={() => handleRemoveTag(tag)}
+                          size="small"
+                          color={tag.expires ? 'warning' : 'default'}
+                          variant="outlined"
+                          disabled={actionLoading}
+                        />
+                      </Tooltip>
+                    ))}
+                    <Chip
+                      icon={<Add />}
+                      label="Add Tag"
+                      onClick={() => setAddTagDialogOpen(true)}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      disabled={actionLoading}
+                    />
+                  </Box>
+
+                  {/* Aliases */}
+                  {threativoreUser.aliases.length > 0 && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom>Aliases</Typography>
+                      <Box display="flex" gap={1} mb={2} flexWrap="wrap">
+                        {threativoreUser.aliases.map((alias, idx) => (
+                          <Chip key={idx} label={alias} size="small" variant="outlined" />
+                        ))}
+                      </Box>
+                    </>
+                  )}
+
+                  {/* Delete from Threativore */}
+                  <Box display="flex" justifyContent="flex-end" mt={1}>
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<PersonRemove />}
+                      onClick={handleDeleteFromThreativore}
+                      disabled={actionLoading}
+                    >
+                      Remove from Threativore
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Add Tag Dialog */}
+          <Dialog open={addTagDialogOpen} onClose={() => setAddTagDialogOpen(false)}>
+            <DialogTitle>Add Tag</DialogTitle>
+            <DialogContent>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Tag Name"
+                fullWidth
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+              />
+              <TextField
+                margin="dense"
+                label="Value (optional)"
+                fullWidth
+                value={newTagValue}
+                onChange={(e) => setNewTagValue(e.target.value)}
+              />
+              <TextField
+                margin="dense"
+                label="Expires (optional, ISO date)"
+                fullWidth
+                placeholder="2026-12-31T23:59:59Z"
+                value={newTagExpires}
+                onChange={(e) => setNewTagExpires(e.target.value)}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setAddTagDialogOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleAddTag}
+                variant="contained"
+                disabled={!newTagName.trim() || actionLoading}
+              >
+                {actionLoading ? <CircularProgress size={24} /> : 'Add Tag'}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
           {/* Community Filter Section */}
           <Card sx={{ mb: 3 }}>

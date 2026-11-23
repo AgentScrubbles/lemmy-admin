@@ -13,6 +13,7 @@ import { Modlog } from './pages/Modlog';
 import { CommunityDetail } from './pages/CommunityDetail';
 import { CreateBot } from './pages/CreateBot';
 import { Unauthorized } from './pages/Unauthorized';
+import { OpenVotes } from './pages/OpenVotes';
 
 const App: React.FC = () => {
   return (
@@ -98,6 +99,16 @@ const App: React.FC = () => {
                 <ProtectedRoute>
                   <Layout>
                     <Modlog />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/votes"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <OpenVotes />
                   </Layout>
                 </ProtectedRoute>
               }

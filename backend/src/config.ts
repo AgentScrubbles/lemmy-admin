@@ -34,6 +34,10 @@ export const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   },
+  threativore: {
+    url: process.env.THREATIVORE_URL || '',
+    apiKey: process.env.THREATIVORE_API_KEY || '',
+  },
 } as const;
 
 // Validate required environment variables
